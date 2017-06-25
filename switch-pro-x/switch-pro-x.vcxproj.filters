@@ -1,0 +1,57 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="External">
+      <UniqueIdentifier>{b9950f1c-d437-481e-a5a3-032057b37024}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\libusb">
+      <UniqueIdentifier>{14dc2b4f-372d-44ea-a8ca-c4865455aab9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\libusb\include">
+      <UniqueIdentifier>{cad5de4b-f29e-4183-bd5f-b9514638839a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\libusb\include\libusb-1.0">
+      <UniqueIdentifier>{a8b9f473-befa-4f05-831b-2252e6cebd89}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="common.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ProControllerDevice.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="switch-pro-x.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="connection_callback.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="External\libusb\include\libusb-1.0\libusb.h">
+      <Filter>External\libusb\include\libusb-1.0</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="switch-pro-x.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="connection_callback.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ProControllerDevice.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>
