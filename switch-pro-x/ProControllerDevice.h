@@ -24,6 +24,7 @@ public:
     libusb_device *Device;
 
 private:
+    uint8_t counter;
     libusb_device_handle *handle;
     XUSB_REPORT last_report;
 

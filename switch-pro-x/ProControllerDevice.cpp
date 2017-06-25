@@ -73,7 +73,7 @@ namespace
 #pragma pack(pop)
 }
 
-ProControllerDevice::ProControllerDevice(libusb_device *dev) : Device(dev), handle(nullptr), quitting(false), last_report({ 0 })
+ProControllerDevice::ProControllerDevice(libusb_device *dev) : counter(0), Device(dev), handle(nullptr), quitting(false), last_report({ 0 })
 {
     if (libusb_open(Device, &handle) != 0)
     {
@@ -232,13 +232,17 @@ void ProControllerDevice::ReadThread()
 
             if (report != last_report)
             {
-                auto ret = vigem_xusb_submit_report(ViGEm_Target, report);
-
-                if (!VIGEM_SUCCESS(ret))
+                // work around weird xusb driver quirk: https://github.com/nefarius/ViGEm/issues/4
+                for (auto i = 0; i < 3; i++)
                 {
-                    std::cerr << "error sending report: " << std::hex << std::showbase << ret << std::endl;
+                    auto ret = vigem_xusb_submit_report(ViGEm_Target, report);
 
-                    quitting = true;
+                    if (!VIGEM_SUCCESS(ret))
+                    {
+                        std::cerr << "error sending report: " << std::hex << std::showbase << ret << std::endl;
+
+                        quitting = true;
+                    }
                 }
 
                 last_report = report;
@@ -278,4 +282,7 @@ void ProControllerDevice::WriteData(uint8_t *buf, size_t size)
 void ProControllerDevice::HandleXUSBCallback(UCHAR large_motor, UCHAR small_motor, UCHAR led_number)
 {
     std::cout << "XUSB CALLBACK (" << this << ") LARGE MOTOR: " << +large_motor << ", SMALL MOTOR: " << +small_motor << ", LED: " << +led_number << std::endl;
+
+    uint8_t buf[65] = { 0x01, counter++ & 0x0F, 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 1 << led_number };
+    WriteData(buf, sizeof(buf));
 }
