@@ -3,6 +3,7 @@
 #include <Windows.h>
 
 #include <libusb-1.0/libusb.h>
+#include <ViGEmUM.h>
 
 #include <atomic>
 #include <thread>
@@ -22,6 +23,7 @@ public:
 private:
     libusb_device *device;
     libusb_device_handle *handle;
+    VIGEM_TARGET vigem_target;
 
     void ReadThread();
 

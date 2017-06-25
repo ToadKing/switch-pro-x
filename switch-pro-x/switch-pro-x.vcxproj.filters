@@ -25,6 +25,12 @@
     <Filter Include="External\libusb\include\libusb-1.0">
       <UniqueIdentifier>{a8b9f473-befa-4f05-831b-2252e6cebd89}</UniqueIdentifier>
     </Filter>
+    <Filter Include="External\ViGEmUM">
+      <UniqueIdentifier>{86b0524c-2e69-40ec-a021-92f656f7bf36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\ViGEmUM\include">
+      <UniqueIdentifier>{6b3e1349-d7a7-497a-8d93-a55793d523e4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="common.h">
@@ -41,6 +47,12 @@
     </ClInclude>
     <ClInclude Include="External\libusb\include\libusb-1.0\libusb.h">
       <Filter>External\libusb\include\libusb-1.0</Filter>
+    </ClInclude>
+    <ClInclude Include="External\ViGEmUM\include\ViGEmBusShared.h">
+      <Filter>External\ViGEmUM\include</Filter>
+    </ClInclude>
+    <ClInclude Include="External\ViGEmUM\include\ViGEmUM.h">
+      <Filter>External\ViGEmUM\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

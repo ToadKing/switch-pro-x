@@ -9,6 +9,8 @@
 
 #include <cstdint>
 
+#include <ViGEmUM.h>
+
 #include "common.h"
 #include "connection_callback.h"
 #include "switch-pro-x.h"
@@ -21,7 +23,7 @@ namespace {
 
 void AddController(libusb_device *dev)
 {
-    std::unique_lock<std::mutex> lk(controllerMapMutex);
+    std::lock_guard<std::mutex> lk(controllerMapMutex);
     auto device = std::make_unique<ProControllerDevice>(dev);
     if (device->Valid()) {
         std::cout << "FOUND PRO CONTROLLER: " << device.get() << std::endl;
@@ -31,7 +33,7 @@ void AddController(libusb_device *dev)
 
 void RemoveController(libusb_device *dev)
 {
-    std::unique_lock<std::mutex> lk(controllerMapMutex);
+    std::lock_guard<std::mutex> lk(controllerMapMutex);
     auto it = proControllers.find(dev);
     if (it != proControllers.end())
     {
@@ -42,6 +44,17 @@ void RemoveController(libusb_device *dev)
 
 int main()
 {
+    auto ret = vigem_init();
+
+    if (!VIGEM_SUCCESS(ret))
+    {
+        std::cerr << "error initializing ViGEm: " << std::hex << std::showbase << ret << std::endl;
+
+        system("pause");
+
+        return 1;
+    }
+
     SetupDeviceNotifications();
 
     return 0;
