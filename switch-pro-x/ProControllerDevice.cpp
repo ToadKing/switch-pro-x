@@ -10,6 +10,7 @@
 
 #include "common.h"
 #include "ProControllerDevice.h"
+#include "switch-pro-x.h"
 
 //#define PRO_CONTROLLER_DEBUG_OUTPUT
 
@@ -72,37 +73,46 @@ namespace
 #pragma pack(pop)
 }
 
-ProControllerDevice::ProControllerDevice(libusb_device *dev) : device(dev), handle(nullptr), quitting(false), last_report({ 0 })
+ProControllerDevice::ProControllerDevice(libusb_device *dev) : Device(dev), handle(nullptr), quitting(false), last_report({ 0 })
 {
-    if (libusb_open(device, &handle) != 0)
+    if (libusb_open(Device, &handle) != 0)
     {
-        std::cerr << "Error opening device " << device << std::endl;
+        std::cerr << "Error opening Device " << Device << std::endl;
         return;
     }
 
     if (libusb_kernel_driver_active(handle, 0) == 1 && libusb_detach_kernel_driver(handle, 0))
     {
-        std::cerr << "Error detaching handle from " << device << " from kernel" << std::endl;
+        std::cerr << "Error detaching handle from " << Device << " from kernel" << std::endl;
         return;
     }
 
     if (libusb_claim_interface(handle, 0) != 0)
     {
-        std::cerr << "Error claiming interface on " << device << std::endl;
+        std::cerr << "Error claiming interface on " << Device << std::endl;
         return;
     }
 
-    VIGEM_TARGET_INIT(&vigem_target);
+    VIGEM_TARGET_INIT(&ViGEm_Target);
 
     // We don't want to match the libusb driver again, don't set vid/pid and use the default one from ViGEm
-    //vigem_target_set_vid(&vigem_target, PRO_CONTROLLER_VID);
-    //vigem_target_set_pid(&vigem_target, PRO_CONTROLLER_PID);
+    //vigem_target_set_vid(&ViGEm_Target, PRO_CONTROLLER_VID);
+    //vigem_target_set_pid(&ViGEm_Target, PRO_CONTROLLER_PID);
 
-    auto ret = vigem_target_plugin(Xbox360Wired, &vigem_target);
+    auto ret = vigem_target_plugin(Xbox360Wired, &ViGEm_Target);
 
     if (!VIGEM_SUCCESS(ret))
     {
         std::cerr << "error creating controller: " << std::hex << std::showbase << ret << std::endl;
+
+        return;
+    }
+
+    ret = vigem_register_xusb_notification(XUSBCallback, ViGEm_Target);
+
+    if (!VIGEM_SUCCESS(ret))
+    {
+        std::cerr << "error creating notification callback: " << std::hex << std::showbase << ret << std::endl;
 
         return;
     }
@@ -222,7 +232,7 @@ void ProControllerDevice::ReadThread()
 
             if (report != last_report)
             {
-                auto ret = vigem_xusb_submit_report(vigem_target, report);
+                auto ret = vigem_xusb_submit_report(ViGEm_Target, report);
 
                 if (!VIGEM_SUCCESS(ret))
                 {
@@ -251,7 +261,7 @@ ProControllerDevice::~ProControllerDevice()
 
     if (connected)
     {
-        vigem_target_unplug(&vigem_target);
+        vigem_target_unplug(&ViGEm_Target);
     }
 }
 
@@ -263,4 +273,9 @@ void ProControllerDevice::WriteData(uint8_t *buf, size_t size)
 {
     int tmp;
     int err = libusb_interrupt_transfer(handle, EP_OUT, buf, static_cast<int>(size), &tmp, 100);
+}
+
+void ProControllerDevice::HandleXUSBCallback(UCHAR large_motor, UCHAR small_motor, UCHAR led_number)
+{
+    std::cout << "XUSB CALLBACK (" << this << ") LARGE MOTOR: " << +large_motor << ", SMALL MOTOR: " << +small_motor << ", LED: " << +led_number << std::endl;
 }

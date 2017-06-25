@@ -19,11 +19,12 @@ public:
 
     bool Valid();
     void WriteData(uint8_t *bytes, size_t size);
+    void HandleXUSBCallback(UCHAR large_motor, UCHAR small_motor, UCHAR led_number);
+    VIGEM_TARGET ViGEm_Target;
+    libusb_device *Device;
 
 private:
-    libusb_device *device;
     libusb_device_handle *handle;
-    VIGEM_TARGET vigem_target;
     XUSB_REPORT last_report;
 
     void ReadThread();

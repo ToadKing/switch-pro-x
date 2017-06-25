@@ -22,7 +22,8 @@ namespace {
 
     inline bool operator==(const XUSB_REPORT& lhs, const XUSB_REPORT& rhs)
     {
-        return lhs.wButtons == rhs.wButtons &&
+        return
+            lhs.wButtons == rhs.wButtons &&
             lhs.bLeftTrigger == rhs.bLeftTrigger &&
             lhs.bRightTrigger == rhs.bRightTrigger &&
             lhs.sThumbLX == rhs.sThumbLX &&
@@ -32,6 +33,19 @@ namespace {
     }
 
     inline bool operator!=(const XUSB_REPORT& lhs, const XUSB_REPORT& rhs)
+    {
+        return !(lhs == rhs);
+    }
+
+    inline bool operator==(const VIGEM_TARGET& lhs, const VIGEM_TARGET& rhs)
+    {
+        return
+            lhs.ProductId == rhs.ProductId &&
+            lhs.VendorId == rhs.VendorId &&
+            lhs.SerialNo == rhs.SerialNo;
+    }
+
+    inline bool operator!=(const VIGEM_TARGET& lhs, const VIGEM_TARGET& rhs)
     {
         return !(lhs == rhs);
     }

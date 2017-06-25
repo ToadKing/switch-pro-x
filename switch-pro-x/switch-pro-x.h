@@ -8,3 +8,4 @@
 
 void AddController(libusb_device *device);
 void RemoveController(libusb_device *device);
+VOID CALLBACK XUSBCallback(VIGEM_TARGET target, UCHAR large_motor, UCHAR small_motor, UCHAR led_number);

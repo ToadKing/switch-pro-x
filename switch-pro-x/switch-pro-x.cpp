@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
-#include <map>
+#include <unordered_set>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -17,7 +17,7 @@
 #include "ProControllerDevice.h"
 
 namespace {
-    std::map<libusb_device *, std::unique_ptr<ProControllerDevice>> proControllers;
+    std::unordered_set<std::unique_ptr<ProControllerDevice>> proControllers;
     std::mutex controllerMapMutex;
 }
 
@@ -27,18 +27,28 @@ void AddController(libusb_device *dev)
     auto device = std::make_unique<ProControllerDevice>(dev);
     if (device->Valid()) {
         std::cout << "FOUND PRO CONTROLLER: " << device.get() << std::endl;
-        proControllers[dev] = std::move(device);
+        proControllers.insert(std::move(device));
     }
 }
 
 void RemoveController(libusb_device *dev)
 {
     std::lock_guard<std::mutex> lk(controllerMapMutex);
-    auto it = proControllers.find(dev);
+    auto it = std::find_if(proControllers.begin(), proControllers.end(), [dev](const std::unique_ptr<ProControllerDevice>& c) { return c->Device == dev; });
     if (it != proControllers.end())
     {
-        std::cout << "REMOVED PRO CONTROLLER: " << it->second.get() << std::endl;
+        std::cout << "REMOVED PRO CONTROLLER: " << it->get() << std::endl;
         proControllers.erase(it);
+    }
+}
+
+VOID CALLBACK XUSBCallback(VIGEM_TARGET target, UCHAR large_motor, UCHAR small_motor, UCHAR led_number)
+{
+    std::lock_guard<std::mutex> lk(controllerMapMutex);
+    auto it = std::find_if(proControllers.begin(), proControllers.end(), [target](const std::unique_ptr<ProControllerDevice>& c) { return c->ViGEm_Target == target; });
+    if (it != proControllers.end())
+    {
+        (*it)->HandleXUSBCallback(large_motor, small_motor, led_number);
     }
 }
 
@@ -56,6 +66,8 @@ int main()
     }
 
     SetupDeviceNotifications();
+
+    vigem_shutdown();
 
     return 0;
 }
