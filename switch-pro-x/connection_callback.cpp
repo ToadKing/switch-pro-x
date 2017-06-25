@@ -12,15 +12,18 @@ namespace {
 
     int HotplugCallback(struct libusb_context *ctx, struct libusb_device *dev, libusb_hotplug_event event, void *user_data)
     {
-        (void)ctx;
-        (void)user_data;
-        if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED)
+        switch (event)
+        {
+        case LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED:
         {
             AddController(dev);
+            break;
         }
-        else if (event == LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT)
+        case LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT:
         {
             RemoveController(dev);
+            break;
+        }
         }
 
         return 0;
@@ -57,7 +60,7 @@ void SetupDeviceNotifications()
         nullptr,
         static_cast<libusb_hotplug_event>(LIBUSB_HOTPLUG_MATCH_ANY),
         static_cast<libusb_hotplug_flag>(0),
-        0x057e, 0x0337,
+        PRO_CONTROLLER_VID, PRO_CONTROLLER_PID,
         LIBUSB_HOTPLUG_MATCH_ANY,
         reinterpret_cast<libusb_hotplug_callback_fn>(HotplugCallback),
         nullptr,
@@ -65,10 +68,10 @@ void SetupDeviceNotifications()
 
     if (hotplug_ret != 0)
     {
-        std::cerr << "cannot register hotplug callback, hotplugging not enabled" << std::endl;
+        std::cerr << "cannot register hotplug callback (" << hotplug_ret << "), hotplugging not enabled" << std::endl;
     }
 
-    // pump events until shutdown & all helper threads finish cleaning up
+    // pump events until shutdown
     while (!quitting)
     {
         libusb_handle_events_completed(nullptr, const_cast<int *>(&quitting));

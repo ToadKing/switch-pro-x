@@ -92,8 +92,10 @@ ProControllerDevice::ProControllerDevice(libusb_device *dev) : device(dev), hand
     }
 
     VIGEM_TARGET_INIT(&vigem_target);
-    vigem_target_set_vid(&vigem_target, PRO_CONTROLLER_VID);
-    vigem_target_set_vid(&vigem_target, PRO_CONTROLLER_PID);
+
+    // We don't want to match the libusb driver again, don't set vid/pid and use the default one from ViGEm
+    //vigem_target_set_vid(&vigem_target, PRO_CONTROLLER_VID);
+    //vigem_target_set_pid(&vigem_target, PRO_CONTROLLER_PID);
 
     auto ret = vigem_target_plugin(Xbox360Wired, &vigem_target);
 
