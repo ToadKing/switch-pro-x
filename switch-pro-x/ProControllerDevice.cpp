@@ -3,6 +3,7 @@
 
 #include <ViGEmUM.h>
 
+#include <chrono>
 #include <iostream>
 #include <memory>
 
@@ -73,7 +74,13 @@ namespace
 #pragma pack(pop)
 }
 
-ProControllerDevice::ProControllerDevice(libusb_device *dev) : counter(0), Device(dev), handle(nullptr), quitting(false), last_report({ 0 })
+ProControllerDevice::ProControllerDevice(libusb_device *dev)
+    : counter(0)
+    , Device(dev)
+    , handle(nullptr)
+    , quitting(false)
+    , last_rumble()
+    , led_number(0xFF)
 {
     if (libusb_open(Device, &handle) != 0)
     {
@@ -127,6 +134,9 @@ ProControllerDevice::ProControllerDevice(libusb_device *dev) : counter(0), Devic
 
 void ProControllerDevice::ReadThread()
 {
+    UCHAR last_led = 0xFF;
+    XUSB_REPORT last_report = { 0 };
+
     while (!quitting)
     {
         unsigned char data[64] = { 0 };
@@ -134,6 +144,27 @@ void ProControllerDevice::ReadThread()
         int err = libusb_interrupt_transfer(handle, EP_IN, data, sizeof(data), &size, 100);
 
         ProControllerPacket *payload = (ProControllerPacket *)data;
+
+        auto now = std::chrono::steady_clock::now();
+
+        if (now > last_rumble + std::chrono::milliseconds(100))
+        {
+            if (led_number != last_led)
+            {
+                uint8_t buf[65] = { 0x01, counter++ & 0x0F, 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 1 << led_number };
+                WriteData(buf, sizeof(buf));
+
+                last_led = led_number;
+            }
+            else
+            {
+                //uint8_t buf[65] = { 0x10, counter++ & 0x0F, 0x04, 0xBF, 0x40, 0x40, 0x04, 0xBF, 0x40, 0x40 };
+                uint8_t buf[65] = { 0x10, counter++ & 0x0F, 0x04, 0x00, 0x40, 0x40, 0x04, 0x00, 0x40, 0x40 };
+                WriteData(buf, sizeof(buf));
+            }
+
+            last_rumble = now;
+        }
 
         switch (payload->type)
         {
@@ -252,6 +283,20 @@ void ProControllerDevice::ReadThread()
         }
         }
     }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    {
+        uint8_t buf[65] = { 0x10, counter++ & 0x0F, 0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0x40, 0x40 };
+        WriteData(buf, sizeof(buf));
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    {
+        uint8_t buf[65] = { 0x01, counter++ & 0x0F, 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 0x00 };
+        WriteData(buf, sizeof(buf));
+    }
 }
 
 ProControllerDevice::~ProControllerDevice()
@@ -279,10 +324,13 @@ void ProControllerDevice::WriteData(uint8_t *buf, size_t size)
     int err = libusb_interrupt_transfer(handle, EP_OUT, buf, static_cast<int>(size), &tmp, 100);
 }
 
-void ProControllerDevice::HandleXUSBCallback(UCHAR large_motor, UCHAR small_motor, UCHAR led_number)
+void ProControllerDevice::HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_motor, UCHAR _led_number)
 {
-    std::cout << "XUSB CALLBACK (" << this << ") LARGE MOTOR: " << +large_motor << ", SMALL MOTOR: " << +small_motor << ", LED: " << +led_number << std::endl;
+#ifdef PRO_CONTROLLER_DEBUG_OUTPUT
+    std::cout << "XUSB CALLBACK (" << this << ") LARGE MOTOR: " << +_large_motor << ", SMALL MOTOR: " << +_small_motor << ", LED: " << +_led_number << std::endl;
+#endif
 
-    uint8_t buf[65] = { 0x01, counter++ & 0x0F, 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 1 << led_number };
-    WriteData(buf, sizeof(buf));
+    large_motor = _large_motor;
+    small_motor = _small_motor;
+    led_number = _led_number;
 }

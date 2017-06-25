@@ -8,6 +8,7 @@
 #include <string>
 
 #include <cstdint>
+#include <cstdlib>
 
 #include <ViGEmUM.h>
 
@@ -52,8 +53,27 @@ VOID CALLBACK XUSBCallback(VIGEM_TARGET target, UCHAR large_motor, UCHAR small_m
     }
 }
 
+BOOL ctrl_handler(DWORD event)
+{
+    if (event == CTRL_CLOSE_EVENT)
+    {
+        std::exit(0);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 int main()
 {
+    SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(ctrl_handler), TRUE);
+
+    std::atexit([] {
+        proControllers.clear();
+
+        vigem_shutdown();
+    });
+
     auto ret = vigem_init();
 
     if (!VIGEM_SUCCESS(ret))
@@ -66,8 +86,6 @@ int main()
     }
 
     SetupDeviceNotifications();
-
-    vigem_shutdown();
 
     return 0;
 }

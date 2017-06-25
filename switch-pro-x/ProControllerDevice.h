@@ -6,6 +6,7 @@
 #include <ViGEmUM.h>
 
 #include <atomic>
+#include <chrono>
 #include <thread>
 
 #include <cstdint>
@@ -19,16 +20,22 @@ public:
 
     bool Valid();
     void WriteData(uint8_t *bytes, size_t size);
-    void HandleXUSBCallback(UCHAR large_motor, UCHAR small_motor, UCHAR led_number);
+    void HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_motor, UCHAR _led_number);
+
+    // used for identification, so make them public
     VIGEM_TARGET ViGEm_Target;
     libusb_device *Device;
 
 private:
+    void ReadThread();
+
     uint8_t counter;
     libusb_device_handle *handle;
-    XUSB_REPORT last_report;
+    std::chrono::steady_clock::time_point last_rumble;
 
-    void ReadThread();
+    std::atomic<UCHAR> led_number;
+    std::atomic<UCHAR> large_motor;
+    std::atomic<UCHAR> small_motor;
 
     bool connected;
     std::atomic<bool> quitting;
