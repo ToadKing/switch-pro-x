@@ -24,6 +24,7 @@ private:
     libusb_device *device;
     libusb_device_handle *handle;
     VIGEM_TARGET vigem_target;
+    XUSB_REPORT last_report;
 
     void ReadThread();
 

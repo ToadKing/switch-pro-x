@@ -8,6 +8,7 @@
 
 #include <cstring>
 
+#include "common.h"
 #include "ProControllerDevice.h"
 
 //#define PRO_CONTROLLER_DEBUG_OUTPUT
@@ -71,7 +72,7 @@ namespace
 #pragma pack(pop)
 }
 
-ProControllerDevice::ProControllerDevice(libusb_device *dev) : device(dev), handle(nullptr), quitting(false)
+ProControllerDevice::ProControllerDevice(libusb_device *dev) : device(dev), handle(nullptr), quitting(false), last_report({ 0 })
 {
     if (libusb_open(device, &handle) != 0)
     {
@@ -219,13 +220,18 @@ void ProControllerDevice::ReadThread()
             report.sThumbRX= rx * 257;
             report.sThumbRY = ry * 257;
 
-            auto ret = vigem_xusb_submit_report(vigem_target, report);
-
-            if (!VIGEM_SUCCESS(ret))
+            if (report != last_report)
             {
-                std::cerr << "error sending report: " << std::hex << std::showbase << ret << std::endl;
+                auto ret = vigem_xusb_submit_report(vigem_target, report);
 
-                quitting = true;
+                if (!VIGEM_SUCCESS(ret))
+                {
+                    std::cerr << "error sending report: " << std::hex << std::showbase << ret << std::endl;
+
+                    quitting = true;
+                }
+
+                last_report = report;
             }
 
             break;
