@@ -35,11 +35,11 @@ void SetupDeviceNotifications()
     libusb_hotplug_callback_handle callback;
     int hotplug_ret = libusb_hotplug_register_callback(
         nullptr,
-        static_cast<libusb_hotplug_event>(LIBUSB_HOTPLUG_MATCH_ANY),
+        static_cast<libusb_hotplug_event>(LIBUSB_HOTPLUG_EVENT_DEVICE_ARRIVED | LIBUSB_HOTPLUG_EVENT_DEVICE_LEFT),
         LIBUSB_HOTPLUG_ENUMERATE,
         PRO_CONTROLLER_VID, PRO_CONTROLLER_PID,
         LIBUSB_HOTPLUG_MATCH_ANY,
-        reinterpret_cast<libusb_hotplug_callback_fn>(HotplugCallback),
+        HotplugCallback,
         nullptr,
         &callback);
 
