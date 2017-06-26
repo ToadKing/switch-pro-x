@@ -55,10 +55,11 @@ VOID CALLBACK XUSBCallback(VIGEM_TARGET target, UCHAR large_motor, UCHAR small_m
 
 BOOL ctrl_handler(DWORD event)
 {
-    if (event == CTRL_CLOSE_EVENT)
+    if (event == CTRL_CLOSE_EVENT ||
+        event == CTRL_C_EVENT ||
+        event == CTRL_BREAK_EVENT)
     {
         std::exit(0);
-        return TRUE;
     }
 
     return FALSE;
