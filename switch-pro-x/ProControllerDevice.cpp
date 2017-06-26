@@ -151,15 +151,26 @@ void ProControllerDevice::ReadThread()
         {
             if (led_number != last_led)
             {
-                uint8_t buf[65] = { 0x01, counter++ & 0x0F, 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 1 << led_number };
+                uint8_t buf[65] = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, static_cast<uint8_t>(1 << led_number) };
                 WriteData(buf, sizeof(buf));
 
                 last_led = led_number;
             }
             else
             {
-                //uint8_t buf[65] = { 0x10, counter++ & 0x0F, 0x04, 0xBF, 0x40, 0x40, 0x04, 0xBF, 0x40, 0x40 };
-                uint8_t buf[65] = { 0x10, counter++ & 0x0F, 0x04, 0x00, 0x40, 0x40, 0x04, 0x00, 0x40, 0x40 };
+                uint8_t buf[65] = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
+
+                if (large_motor != 0)
+                {
+                    buf[2] = buf[6] = 0x08;
+                    buf[3] = buf[7] = large_motor;
+                }
+                else if (small_motor != 0)
+                {
+                    buf[2] = buf[6] = 0x10;
+                    buf[3] = buf[7] = small_motor;
+                }
+
                 WriteData(buf, sizeof(buf));
             }
 
@@ -287,14 +298,14 @@ void ProControllerDevice::ReadThread()
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     {
-        uint8_t buf[65] = { 0x10, counter++ & 0x0F, 0x00, 0x00, 0x40, 0x40, 0x00, 0x00, 0x40, 0x40 };
+        uint8_t buf[65] = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
         WriteData(buf, sizeof(buf));
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     {
-        uint8_t buf[65] = { 0x01, counter++ & 0x0F, 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 0x00 };
+        uint8_t buf[65] = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 0x00 };
         WriteData(buf, sizeof(buf));
     }
 }
