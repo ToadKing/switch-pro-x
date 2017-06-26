@@ -120,6 +120,7 @@ ProControllerDevice::ProControllerDevice(libusb_device *dev)
     if (!VIGEM_SUCCESS(ret))
     {
         std::cerr << "error creating notification callback: " << std::hex << std::showbase << ret << std::endl;
+        vigem_target_unplug(&ViGEm_Target);
 
         return;
     }
@@ -136,6 +137,7 @@ void ProControllerDevice::ReadThread()
 {
     UCHAR last_led = 0xFF;
     XUSB_REPORT last_report = { 0 };
+    bool first_control = false;
 
     while (!quitting)
     {
@@ -147,7 +149,7 @@ void ProControllerDevice::ReadThread()
 
         auto now = std::chrono::steady_clock::now();
 
-        if (now > last_rumble + std::chrono::milliseconds(100))
+        if (first_control && now > last_rumble + std::chrono::milliseconds(100))
         {
             if (led_number != last_led)
             {
@@ -202,6 +204,12 @@ void ProControllerDevice::ReadThread()
         {
             const auto analog = payload->data.controller_data.analog;
             const auto buttons = payload->data.controller_data.buttons;
+
+            if (!first_control)
+            {
+                last_rumble = std::chrono::steady_clock::now();
+                first_control = true;
+            }
 
             int8_t lx = static_cast<int8_t>(((analog[1] & 0x0F) << 4) | ((analog[0] & 0xF0) >> 4)) + 127;
             int8_t ly = analog[2] + 127;
@@ -321,6 +329,7 @@ ProControllerDevice::~ProControllerDevice()
 
     if (connected)
     {
+        vigem_unregister_xusb_notification(XUSBCallback);
         vigem_target_unplug(&ViGEm_Target);
     }
 }
