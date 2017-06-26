@@ -53,13 +53,15 @@ VOID CALLBACK XUSBCallback(VIGEM_TARGET target, UCHAR large_motor, UCHAR small_m
     }
 }
 
-BOOL ctrl_handler(DWORD event)
+BOOL WINAPI ctrl_handler(DWORD _In_ event)
 {
     if (event == CTRL_CLOSE_EVENT ||
         event == CTRL_C_EVENT ||
         event == CTRL_BREAK_EVENT)
     {
         std::exit(0);
+
+        return TRUE;
     }
 
     return FALSE;
@@ -67,7 +69,7 @@ BOOL ctrl_handler(DWORD event)
 
 int main()
 {
-    SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(ctrl_handler), TRUE);
+    SetConsoleCtrlHandler(ctrl_handler, TRUE);
 
     std::atexit([] {
         // trigger deconstructors for all controllers
