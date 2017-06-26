@@ -8,7 +8,7 @@
 #include "switch-pro-x.h"
 
 namespace {
-    int HotplugCallback(struct libusb_context *ctx, struct libusb_device *dev, libusb_hotplug_event event, void *user_data)
+    int LIBUSB_CALL HotplugCallback(struct libusb_context *ctx, struct libusb_device *dev, libusb_hotplug_event event, void *user_data)
     {
         switch (event)
         {
@@ -31,8 +31,6 @@ namespace {
 void SetupDeviceNotifications()
 {
     libusb_init(nullptr);
-
-    struct libusb_device **devices;
 
     libusb_hotplug_callback_handle callback;
     int hotplug_ret = libusb_hotplug_register_callback(
