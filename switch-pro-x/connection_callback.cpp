@@ -8,8 +8,6 @@
 #include "switch-pro-x.h"
 
 namespace {
-    volatile int quitting;
-
     int HotplugCallback(struct libusb_context *ctx, struct libusb_device *dev, libusb_hotplug_event event, void *user_data)
     {
         switch (event)
@@ -32,8 +30,6 @@ namespace {
 
 void SetupDeviceNotifications()
 {
-    quitting = 0;
-
     libusb_init(nullptr);
 
     struct libusb_device **devices;
@@ -72,10 +68,8 @@ void SetupDeviceNotifications()
     }
 
     // pump events until shutdown
-    while (!quitting)
+    for (;;)
     {
-        libusb_handle_events_completed(nullptr, const_cast<int *>(&quitting));
+        libusb_handle_events_completed(nullptr, nullptr);
     }
-
-    libusb_exit(nullptr);
 }

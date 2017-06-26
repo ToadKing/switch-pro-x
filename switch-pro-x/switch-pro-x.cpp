@@ -69,6 +69,7 @@ int main()
     SetConsoleCtrlHandler(reinterpret_cast<PHANDLER_ROUTINE>(ctrl_handler), TRUE);
 
     std::atexit([] {
+        // trigger deconstructors for all controllers
         proControllers.clear();
 
         vigem_shutdown();
