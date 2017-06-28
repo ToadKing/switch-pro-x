@@ -6,6 +6,7 @@
 #include <chrono>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 #include <cstring>
 
@@ -25,6 +26,8 @@ namespace
 
     constexpr uint8_t STATUS_TYPE_SERIAL = 0x01;
     constexpr uint8_t STATUS_TYPE_INIT = 0x02;
+
+    constexpr DWORD TIMEOUT = 500;
 
     enum {
         SWITCH_BUTTON_MASK_A = 0x00000800,
@@ -74,31 +77,77 @@ namespace
 #pragma pack(pop)
 }
 
-ProControllerDevice::ProControllerDevice(libusb_device *dev)
+ProControllerDevice::ProControllerDevice(tstring path)
     : counter(0)
-    , Device(dev)
-    , handle(nullptr)
+    , Path(path)
+    , handle(INVALID_HANDLE_VALUE)
     , quitting(false)
     , last_rumble()
     , led_number(0xFF)
 {
-    if (libusb_open(Device, &handle) != 0)
+    using std::cerr;
+    using std::endl;
+
+    handle = CreateFile(
+        path.c_str(),
+        GENERIC_WRITE | GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        NULL,
+        OPEN_EXISTING,
+        FILE_FLAG_OVERLAPPED,
+        nullptr);
+
+    if (handle == INVALID_HANDLE_VALUE)
     {
-        std::cerr << "Error opening Device " << Device << std::endl;
+        auto err = GetLastError();
+
+        if (err != ERROR_ACCESS_DENIED)
+        {
+            cerr << "error opening ";
+            *tcerr << path;
+            cerr << " (" << GetLastError() << ")" << endl;
+        }
+
         return;
     }
 
-    if (libusb_kernel_driver_active(handle, 0) == 1 && libusb_detach_kernel_driver(handle, 0))
+    HIDD_ATTRIBUTES attributes;
+    attributes.Size = sizeof(attributes);
+    BOOLEAN ok = HidD_GetAttributes(handle, &attributes);
+
+    if (!ok)
     {
-        std::cerr << "Error detaching handle from " << Device << " from kernel" << std::endl;
+        cerr << "Error calling HidD_GetAttributes (" << GetLastError() << ")" << endl;
         return;
     }
 
-    if (libusb_claim_interface(handle, 0) != 0)
+    if (attributes.ProductID != PRO_CONTROLLER_PID || attributes.VendorID != PRO_CONTROLLER_VID)
     {
-        std::cerr << "Error claiming interface on " << Device << std::endl;
+        // not a pro controller, fail silently
         return;
     }
+
+    PHIDP_PREPARSED_DATA preparsed_data;
+    ok = HidD_GetPreparsedData(handle, &preparsed_data);
+
+    if (!ok)
+    {
+        cerr << "Error calling HidD_GetPreparsedData (" << GetLastError() << ")" << endl;
+        return;
+    }
+
+    HIDP_CAPS caps;
+    NTSTATUS status = HidP_GetCaps(preparsed_data, &caps);
+    HidD_FreePreparsedData(preparsed_data);
+
+    if (status != HIDP_STATUS_SUCCESS)
+    {
+        cerr << "Error calling HidP_GetCaps (" << status << ")" << endl;
+        return;
+    }
+
+    output_size = caps.OutputReportByteLength;
+    input_size = caps.InputReportByteLength;
 
     VIGEM_TARGET_INIT(&ViGEm_Target);
 
@@ -125,8 +174,8 @@ ProControllerDevice::ProControllerDevice(libusb_device *dev)
         return;
     }
 
-    uint8_t data[] = { 0x80, 0x01 };
-    WriteData(data, sizeof(data));
+    std::vector<uint8_t> data = { 0x80, 0x01 };
+    WriteData(data);
 
     read_thread = std::thread(&ProControllerDevice::ReadThread, this);
 
@@ -135,32 +184,38 @@ ProControllerDevice::ProControllerDevice(libusb_device *dev)
 
 void ProControllerDevice::ReadThread()
 {
+    using std::cout;
+    using std::endl;
+    using std::chrono::steady_clock;
+    using std::chrono::milliseconds;
+    using std::this_thread::sleep_for;
+
     UCHAR last_led = 0xFF;
     XUSB_REPORT last_report = { 0 };
     bool first_control = false;
 
     while (!quitting)
     {
-        unsigned char data[64] = { 0 };
         int size = 0;
-        int err = libusb_interrupt_transfer(handle, EP_IN, data, sizeof(data), &size, 100);
+        sleep_for(milliseconds(8));
+        auto data = ReadData();
 
-        ProControllerPacket *payload = (ProControllerPacket *)data;
+        ProControllerPacket *payload = reinterpret_cast<ProControllerPacket *>(data.data());
 
-        auto now = std::chrono::steady_clock::now();
+        auto now = steady_clock::now();
 
-        if (first_control && now > last_rumble + std::chrono::milliseconds(100))
+        if (first_control && now > last_rumble + milliseconds(100))
         {
             if (led_number != last_led)
             {
-                uint8_t buf[65] = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, static_cast<uint8_t>(1 << led_number) };
-                WriteData(buf, sizeof(buf));
+                std::vector<uint8_t> buf = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, static_cast<uint8_t>(1 << led_number) };
+                WriteData(buf);
 
                 last_led = led_number;
             }
             else
             {
-                uint8_t buf[65] = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
+                std::vector<uint8_t> buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
 
                 if (large_motor != 0)
                 {
@@ -173,7 +228,7 @@ void ProControllerDevice::ReadThread()
                     buf[3] = buf[7] = small_motor;
                 }
 
-                WriteData(buf, sizeof(buf));
+                WriteData(buf);
             }
 
             last_rumble = now;
@@ -187,14 +242,14 @@ void ProControllerDevice::ReadThread()
             {
             case STATUS_TYPE_SERIAL:
             {
-                uint8_t payload[] = { 0x80, 0x02 };
-                WriteData(payload, sizeof(payload));
+                std::vector<uint8_t> payload = { 0x80, 0x02 };
+                WriteData(payload);
                 break;
             }
             case STATUS_TYPE_INIT:
             {
-                uint8_t payload[] = { 0x80, 0x04 };
-                WriteData(payload, sizeof(payload));
+                std::vector<uint8_t> payload = { 0x80, 0x04 };
+                WriteData(payload);
                 break;
             }
             }
@@ -217,36 +272,36 @@ void ProControllerDevice::ReadThread()
             int8_t ry = analog[5] + 127;
 
 #ifdef PRO_CONTROLLER_DEBUG_OUTPUT
-            std::cout << "A: " << !!(buttons & SWITCH_BUTTON_MASK_A) << ", ";
-            std::cout << "B: " << !!(buttons & SWITCH_BUTTON_MASK_B) << ", ";
-            std::cout << "X: " << !!(buttons & SWITCH_BUTTON_MASK_X) << ", ";
-            std::cout << "Y: " << !!(buttons & SWITCH_BUTTON_MASK_Y) << ", ";
+            cout << "A: " << !!(buttons & SWITCH_BUTTON_MASK_A) << ", ";
+            cout << "B: " << !!(buttons & SWITCH_BUTTON_MASK_B) << ", ";
+            cout << "X: " << !!(buttons & SWITCH_BUTTON_MASK_X) << ", ";
+            cout << "Y: " << !!(buttons & SWITCH_BUTTON_MASK_Y) << ", ";
 
-            std::cout << "DU: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_UP) << ", ";
-            std::cout << "DD: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_DOWN) << ", ";
-            std::cout << "DL: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_LEFT) << ", ";
-            std::cout << "DR: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_RIGHT) << ", ";
+            cout << "DU: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_UP) << ", ";
+            cout << "DD: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_DOWN) << ", ";
+            cout << "DL: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_LEFT) << ", ";
+            cout << "DR: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_RIGHT) << ", ";
 
-            std::cout << "P: " << !!(buttons & SWITCH_BUTTON_MASK_PLUS) << ", ";
-            std::cout << "M: " << !!(buttons & SWITCH_BUTTON_MASK_MINUS) << ", ";
-            std::cout << "H: " << !!(buttons & SWITCH_BUTTON_MASK_HOME) << ", ";
-            std::cout << "S: " << !!(buttons & SWITCH_BUTTON_MASK_SHARE) << ", ";
+            cout << "P: " << !!(buttons & SWITCH_BUTTON_MASK_PLUS) << ", ";
+            cout << "M: " << !!(buttons & SWITCH_BUTTON_MASK_MINUS) << ", ";
+            cout << "H: " << !!(buttons & SWITCH_BUTTON_MASK_HOME) << ", ";
+            cout << "S: " << !!(buttons & SWITCH_BUTTON_MASK_SHARE) << ", ";
 
-            std::cout << "L: " << !!(buttons & SWITCH_BUTTON_MASK_L) << ", ";
-            std::cout << "ZL: " << !!(buttons & SWITCH_BUTTON_MASK_ZL) << ", ";
-            std::cout << "TL: " << !!(buttons & SWITCH_BUTTON_MASK_THUMB_L) << ", ";
+            cout << "L: " << !!(buttons & SWITCH_BUTTON_MASK_L) << ", ";
+            cout << "ZL: " << !!(buttons & SWITCH_BUTTON_MASK_ZL) << ", ";
+            cout << "TL: " << !!(buttons & SWITCH_BUTTON_MASK_THUMB_L) << ", ";
 
-            std::cout << "R: " << !!(buttons & SWITCH_BUTTON_MASK_R) << ", ";
-            std::cout << "ZR: " << !!(buttons & SWITCH_BUTTON_MASK_ZR) << ", ";
-            std::cout << "TR: " << !!(buttons & SWITCH_BUTTON_MASK_THUMB_R) << ", ";
+            cout << "R: " << !!(buttons & SWITCH_BUTTON_MASK_R) << ", ";
+            cout << "ZR: " << !!(buttons & SWITCH_BUTTON_MASK_ZR) << ", ";
+            cout << "TR: " << !!(buttons & SWITCH_BUTTON_MASK_THUMB_R) << ", ";
 
-            std::cout << "LX: " << +lx << ", ";
-            std::cout << "LY: " << +ly << ", ";
+            cout << "LX: " << +lx << ", ";
+            cout << "LY: " << +ly << ", ";
 
-            std::cout << "RX: " << +rx << ", ";
-            std::cout << "RY: " << +ry;
+            cout << "RX: " << +rx << ", ";
+            cout << "RY: " << +ry;
 
-            std::cout << std::endl;
+            cout << endl;
 #endif
 
             XUSB_REPORT report = { 0 };
@@ -303,18 +358,18 @@ void ProControllerDevice::ReadThread()
         }
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    sleep_for(std::chrono::milliseconds(100));
 
     {
-        uint8_t buf[65] = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
-        WriteData(buf, sizeof(buf));
+        std::vector<uint8_t> buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
+        WriteData(buf);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    sleep_for(std::chrono::milliseconds(100));
 
     {
-        uint8_t buf[65] = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 0x00 };
-        WriteData(buf, sizeof(buf));
+        std::vector<uint8_t> buf = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 0x00 };
+        WriteData(buf);
     }
 }
 
@@ -325,6 +380,11 @@ ProControllerDevice::~ProControllerDevice()
     if (read_thread.joinable())
     {
         read_thread.join();
+    }
+
+    if (handle != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(handle);
     }
 
     if (connected)
@@ -338,19 +398,157 @@ bool ProControllerDevice::Valid() {
     return connected;
 }
 
-void ProControllerDevice::WriteData(uint8_t *buf, size_t size)
+std::vector<uint8_t> ProControllerDevice::ReadData()
 {
-    int tmp;
-    int err = libusb_interrupt_transfer(handle, EP_OUT, buf, static_cast<int>(size), &tmp, 100);
+    using std::cerr;
+    using std::endl;
+
+    std::vector<uint8_t> buf(input_size);
+
+    DWORD bytesRead = 0;
+    OVERLAPPED ol = { 0 };
+    ol.hEvent = CreateEvent(nullptr, FALSE, FALSE, L"");
+
+    if (!ReadFile(handle, buf.data(), static_cast<DWORD>(buf.size()), &bytesRead, &ol))
+    {
+        DWORD err = GetLastError();
+
+        if (err == ERROR_IO_PENDING)
+        {
+            DWORD waitObject = WaitForSingleObject(ol.hEvent, TIMEOUT);
+
+            if (waitObject == WAIT_OBJECT_0)
+            {
+                if (!GetOverlappedResult(handle, &ol, &bytesRead, TRUE))
+                {
+                    auto err = GetLastError();
+                    if (CheckIOError(err))
+                    {
+                        cerr << "Read failed (" << err << ")" << endl;
+                    }
+                }
+            }
+            else
+            {
+                cerr << "Read failed (" << waitObject << ")" << endl;
+
+                // could have timed out, cancel the IO if possible
+                if (CancelIo(handle))
+                {
+                    HANDLE handles[2];
+                    handles[0] = handle;
+                    handles[1] = ol.hEvent;
+                    WaitForMultipleObjects(2, handles, FALSE, INFINITE);
+                }
+            }
+        }
+        else
+        {
+            if (CheckIOError(err))
+            {
+                cerr << "Read failed (" << err << ")" << endl;
+            }
+        }
+    }
+
+    CloseHandle(ol.hEvent);
+
+    buf.resize(bytesRead);
+
+    return buf;
+}
+
+void ProControllerDevice::WriteData(const std::vector<uint8_t>& data)
+{
+    using std::cerr;
+    using std::endl;
+
+    std::vector<uint8_t> buf;
+    if (data.size() < output_size)
+    {
+        buf.resize(output_size);
+        std::copy(data.begin(), data.end(), buf.begin());
+    }
+    else
+    {
+        buf = data;
+    }
+
+    DWORD tmp;
+    OVERLAPPED ol = { 0 };
+    ol.hEvent = CreateEvent(nullptr, FALSE, FALSE, L"");
+
+    if (!WriteFile(handle, buf.data(), static_cast<DWORD>(buf.size()), &tmp, &ol))
+    {
+        DWORD err = GetLastError();
+
+        if (err == ERROR_IO_PENDING)
+        {
+            DWORD waitObject = WaitForSingleObject(ol.hEvent, TIMEOUT);
+
+            if (waitObject == WAIT_OBJECT_0) {
+                if (!GetOverlappedResult(handle, &ol, &tmp, TRUE)) {
+                    auto err = GetLastError();
+                    if (CheckIOError(err))
+                    {
+                        cerr << "Write failed (" << GetLastError() << ")" << endl;
+                    }
+                }
+            }
+            else
+            {
+                cerr << "Write failed (" << waitObject << ")" << endl;
+
+                // could have timed out, cancel the IO if possible
+                if (CancelIo(handle))
+                {
+                    HANDLE handles[2];
+                    handles[0] = handle;
+                    handles[1] = ol.hEvent;
+                    WaitForMultipleObjects(2, handles, FALSE, INFINITE);
+                }
+            }
+        }
+        else
+        {
+            if (CheckIOError(err))
+            {
+                cerr << "Write failed (" << err << ")" << endl;
+            }
+        }
+    }
+
+    CloseHandle(ol.hEvent);
 }
 
 void ProControllerDevice::HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_motor, UCHAR _led_number)
 {
+    using std::cout;
+    using std::endl;
+
 #ifdef PRO_CONTROLLER_DEBUG_OUTPUT
-    std::cout << "XUSB CALLBACK (" << this << ") LARGE MOTOR: " << +_large_motor << ", SMALL MOTOR: " << +_small_motor << ", LED: " << +_led_number << std::endl;
+    cout << "XUSB CALLBACK (" << this << ") LARGE MOTOR: " << +_large_motor << ", SMALL MOTOR: " << +_small_motor << ", LED: " << +_led_number << endl;
 #endif
 
     large_motor = _large_motor;
     small_motor = _small_motor;
     led_number = _led_number;
+}
+
+bool ProControllerDevice::CheckIOError(DWORD err)
+{
+    bool ret = true;
+
+    switch (err)
+    {
+    case ERROR_DEVICE_NOT_CONNECTED:
+    case ERROR_OPERATION_ABORTED:
+    {
+        // not fatal
+        ret = false;
+        break;
+    }
+    }
+
+    return ret;
 }

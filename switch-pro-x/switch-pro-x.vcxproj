@@ -71,19 +71,19 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>External\libusb\include;External\ViGEmUM\include;$(IncludePath)</IncludePath>
+    <IncludePath>External\HidCerberus.Lib\include;External\ViGEmUM\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>External\libusb\include;External\ViGEmUM\include;$(IncludePath)</IncludePath>
+    <IncludePath>External\HidCerberus.Lib\include;External\ViGEmUM\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>External\libusb\include;External\ViGEmUM\include;$(IncludePath)</IncludePath>
+    <IncludePath>External\HidCerberus.Lib\include;External\ViGEmUM\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <IncludePath>External\libusb\include;External\ViGEmUM\include;$(IncludePath)</IncludePath>
+    <IncludePath>External\HidCerberus.Lib\include;External\ViGEmUM\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -98,10 +98,11 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>hid.lib;SetupAPI.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "$(ProjectDir)External\libusb\MS32\dll\*.dll" "$(TargetDir)" /Y
-xcopy "$(ProjectDir)External\ViGEmUM\x86\*.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)External\ViGEmUM\x86\*.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)External\HidCerberus.Lib\x86\*.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -117,10 +118,11 @@ xcopy "$(ProjectDir)External\ViGEmUM\x86\*.dll" "$(TargetDir)" /Y</Command>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>hid.lib;SetupAPI.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "$(ProjectDir)External\libusb\MS64\dll\*.dll" "$(TargetDir)" /Y
-xcopy "$(ProjectDir)External\ViGEmUM\x64\*.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)External\ViGEmUM\x64\*.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)External\HidCerberus.Lib\x64\*.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -140,10 +142,11 @@ xcopy "$(ProjectDir)External\ViGEmUM\x64\*.dll" "$(TargetDir)" /Y</Command>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>hid.lib;SetupAPI.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "$(ProjectDir)External\libusb\MS32\dll\*.dll" "$(TargetDir)" /Y
-xcopy "$(ProjectDir)External\ViGEmUM\x86\*.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)External\ViGEmUM\x86\*.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)External\HidCerberus.Lib\x86\*.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -163,16 +166,17 @@ xcopy "$(ProjectDir)External\ViGEmUM\x86\*.dll" "$(TargetDir)" /Y</Command>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
+      <AdditionalDependencies>hid.lib;SetupAPI.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy "$(ProjectDir)External\libusb\MS64\dll\*.dll" "$(TargetDir)" /Y
-xcopy "$(ProjectDir)External\ViGEmUM\x64\*.dll" "$(TargetDir)" /Y</Command>
+      <Command>xcopy "$(ProjectDir)External\ViGEmUM\x64\*.dll" "$(TargetDir)" /Y
+xcopy "$(ProjectDir)External\HidCerberus.Lib\x64\*.dll" "$(TargetDir)" /Y</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="common.h" />
     <ClInclude Include="connection_callback.h" />
-    <ClInclude Include="External\libusb\include\libusb-1.0\libusb.h" />
+    <ClInclude Include="External\HidCerberus.Lib\include\HidCerberus.Lib.h" />
     <ClInclude Include="External\ViGEmUM\include\ViGEmBusShared.h" />
     <ClInclude Include="External\ViGEmUM\include\ViGEmUM.h" />
     <ClInclude Include="ProControllerDevice.h" />
@@ -184,21 +188,19 @@ xcopy "$(ProjectDir)External\ViGEmUM\x64\*.dll" "$(TargetDir)" /Y</Command>
     <ClCompile Include="switch-pro-x.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="External\libusb\MS32\dll\libusb-1.0.dll" />
-    <None Include="External\libusb\MS32\dll\libusb-1.0.pdb" />
-    <None Include="External\libusb\MS64\dll\libusb-1.0.dll" />
-    <None Include="External\libusb\MS64\dll\libusb-1.0.pdb" />
+    <None Include="External\HidCerberus.Lib\x64\HidCerberus.Lib.dll" />
+    <None Include="External\HidCerberus.Lib\x86\HidCerberus.Lib.dll" />
     <None Include="External\ViGEmUM\x64\ViGEmUM.dll" />
     <None Include="External\ViGEmUM\x86\ViGEmUM.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Library Include="External\libusb\MS32\dll\libusb-1.0.lib">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </Library>
-    <Library Include="External\libusb\MS64\dll\libusb-1.0.lib">
+    <Library Include="External\HidCerberus.Lib\x64\HidCerberus.Lib.lib">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="External\HidCerberus.Lib\x86\HidCerberus.Lib.lib">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </Library>
     <Library Include="External\ViGEmUM\x64\ViGEmUM.lib">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>

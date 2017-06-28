@@ -2,12 +2,12 @@
 
 #include <Windows.h>
 
-#include <libusb-1.0/libusb.h>
 #include <ViGEmUM.h>
 
 #include <atomic>
 #include <chrono>
 #include <thread>
+#include <vector>
 
 #include <cstdint>
 
@@ -15,22 +15,26 @@
 
 class ProControllerDevice {
 public:
-    ProControllerDevice(libusb_device *dev);
+    ProControllerDevice(tstring Path);
     ~ProControllerDevice();
 
     bool Valid();
-    void WriteData(uint8_t *bytes, size_t size);
     void HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_motor, UCHAR _led_number);
 
     // used for identification, so make them public
     VIGEM_TARGET ViGEm_Target;
-    libusb_device *Device;
+    const tstring Path;
 
 private:
     void ReadThread();
+    std::vector<uint8_t> ReadData();
+    void WriteData(const std::vector<uint8_t>& data);
+    bool CheckIOError(DWORD err);
 
     uint8_t counter;
-    libusb_device_handle *handle;
+    HANDLE handle;
+    USHORT output_size;
+    USHORT input_size;
     std::chrono::steady_clock::time_point last_rumble;
 
     std::atomic<UCHAR> led_number;
@@ -41,3 +45,11 @@ private:
     std::atomic<bool> quitting;
     std::thread read_thread;
 };
+
+namespace std {
+    template <> struct hash<ProControllerDevice> {
+        size_t operator()(const ProControllerDevice& x) const {
+            return reinterpret_cast<size_t>(&x);
+        }
+    };
+}

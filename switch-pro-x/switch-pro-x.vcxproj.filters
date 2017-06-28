@@ -16,38 +16,29 @@
     <Filter Include="External">
       <UniqueIdentifier>{b9950f1c-d437-481e-a5a3-032057b37024}</UniqueIdentifier>
     </Filter>
-    <Filter Include="External\libusb">
-      <UniqueIdentifier>{14dc2b4f-372d-44ea-a8ca-c4865455aab9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="External\libusb\include">
-      <UniqueIdentifier>{cad5de4b-f29e-4183-bd5f-b9514638839a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="External\libusb\include\libusb-1.0">
-      <UniqueIdentifier>{a8b9f473-befa-4f05-831b-2252e6cebd89}</UniqueIdentifier>
-    </Filter>
     <Filter Include="External\ViGEmUM">
       <UniqueIdentifier>{86b0524c-2e69-40ec-a021-92f656f7bf36}</UniqueIdentifier>
     </Filter>
     <Filter Include="External\ViGEmUM\include">
       <UniqueIdentifier>{6b3e1349-d7a7-497a-8d93-a55793d523e4}</UniqueIdentifier>
     </Filter>
-    <Filter Include="External\libusb\MS32">
-      <UniqueIdentifier>{669f7dac-c20a-4f47-baa3-e565023c37ca}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="External\libusb\MS32\dll">
-      <UniqueIdentifier>{e11b6809-d0d9-484a-a33b-c2f9acae7ac6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="External\libusb\MS64">
-      <UniqueIdentifier>{3d60b298-91b4-4661-a22b-85d0a6428a09}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="External\libusb\MS64\dll">
-      <UniqueIdentifier>{471be7eb-64a9-43c8-b1d2-f2d08a6b3c24}</UniqueIdentifier>
-    </Filter>
     <Filter Include="External\ViGEmUM\x86">
       <UniqueIdentifier>{decf3555-ea89-4955-82c1-bdd376c863e0}</UniqueIdentifier>
     </Filter>
     <Filter Include="External\ViGEmUM\x64">
       <UniqueIdentifier>{fe8af3a8-640a-4373-8d63-8550143948bc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\HidCerberus.Lib">
+      <UniqueIdentifier>{5820a504-49a9-46ca-8551-14d33de19292}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\HidCerberus.Lib\include">
+      <UniqueIdentifier>{81a48f31-b0b7-4101-9d12-3211392e8b00}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\HidCerberus.Lib\x86">
+      <UniqueIdentifier>{45d473a1-555c-4be1-9032-f94ecff1aee6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="External\HidCerberus.Lib\x64">
+      <UniqueIdentifier>{e0041370-bef3-422e-a979-2a2c07e326f2}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -63,14 +54,14 @@
     <ClInclude Include="connection_callback.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="External\libusb\include\libusb-1.0\libusb.h">
-      <Filter>External\libusb\include\libusb-1.0</Filter>
-    </ClInclude>
     <ClInclude Include="External\ViGEmUM\include\ViGEmBusShared.h">
       <Filter>External\ViGEmUM\include</Filter>
     </ClInclude>
     <ClInclude Include="External\ViGEmUM\include\ViGEmUM.h">
       <Filter>External\ViGEmUM\include</Filter>
+    </ClInclude>
+    <ClInclude Include="External\HidCerberus.Lib\include\HidCerberus.Lib.h">
+      <Filter>External\HidCerberus.Lib\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -85,37 +76,31 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="External\libusb\MS32\dll\libusb-1.0.dll">
-      <Filter>External\libusb\MS32\dll</Filter>
-    </None>
-    <None Include="External\libusb\MS32\dll\libusb-1.0.pdb">
-      <Filter>External\libusb\MS32\dll</Filter>
-    </None>
-    <None Include="External\libusb\MS64\dll\libusb-1.0.pdb">
-      <Filter>External\libusb\MS64\dll</Filter>
-    </None>
-    <None Include="External\libusb\MS64\dll\libusb-1.0.dll">
-      <Filter>External\libusb\MS64\dll</Filter>
-    </None>
     <None Include="External\ViGEmUM\x64\ViGEmUM.dll">
       <Filter>External\ViGEmUM\x64</Filter>
     </None>
     <None Include="External\ViGEmUM\x86\ViGEmUM.dll">
       <Filter>External\ViGEmUM\x86</Filter>
     </None>
+    <None Include="External\HidCerberus.Lib\x64\HidCerberus.Lib.dll">
+      <Filter>External\HidCerberus.Lib\x64</Filter>
+    </None>
+    <None Include="External\HidCerberus.Lib\x86\HidCerberus.Lib.dll">
+      <Filter>External\HidCerberus.Lib\x86</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
-    <Library Include="External\libusb\MS32\dll\libusb-1.0.lib">
-      <Filter>External\libusb\MS32\dll</Filter>
-    </Library>
-    <Library Include="External\libusb\MS64\dll\libusb-1.0.lib">
-      <Filter>External\libusb\MS64\dll</Filter>
-    </Library>
     <Library Include="External\ViGEmUM\x64\ViGEmUM.lib">
       <Filter>External\ViGEmUM\x64</Filter>
     </Library>
     <Library Include="External\ViGEmUM\x86\ViGEmUM.lib">
       <Filter>External\ViGEmUM\x86</Filter>
+    </Library>
+    <Library Include="External\HidCerberus.Lib\x64\HidCerberus.Lib.lib">
+      <Filter>External\HidCerberus.Lib\x64</Filter>
+    </Library>
+    <Library Include="External\HidCerberus.Lib\x86\HidCerberus.Lib.lib">
+      <Filter>External\HidCerberus.Lib\x86</Filter>
     </Library>
   </ItemGroup>
 </Project>
