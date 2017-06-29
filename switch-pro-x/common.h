@@ -1,11 +1,13 @@
 #pragma once
 
 #include <string>
+#include <iostream>
 #include <algorithm>
 
 #include <ViGEmUM.h>
 
-namespace {
+namespace
+{
 #ifdef UNICODE
     typedef std::wstring tstring;
     const auto tcout = &std::wcout;
@@ -16,23 +18,27 @@ namespace {
     const auto tcerr = &std::cerr;
 #endif
 
-    constexpr LPTSTR WND_MODULE_NAME = TEXT("switch-pro-x.exe");
+    constexpr LPCTSTR WND_MODULE_NAME = TEXT("switch-pro-x.exe");
     constexpr uint16_t PRO_CONTROLLER_VID = 0x057E;
     constexpr uint16_t PRO_CONTROLLER_PID = 0x2009;
 
     inline void tstring_upper(tstring& str)
     {
-        std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+        using std::transform;
+
+        transform(str.begin(), str.end(), str.begin(), ::toupper);
     }
 
     inline bool tstring_icompare(const tstring& lhs, const tstring& rhs)
     {
+        using std::equal;
+
         if (lhs.size() != rhs.size())
         {
             return false;
         }
 
-        return std::equal(lhs.begin(), lhs.end(), rhs.begin(), [](auto lhs, auto rhs) { return ::tolower(lhs) == ::tolower(rhs); });
+        return equal(lhs.begin(), lhs.end(), rhs.begin(), [](const auto& lhs, const auto& rhs) { return ::tolower(lhs) == ::tolower(rhs); });
     }
 
     inline bool operator==(const XUSB_REPORT& lhs, const XUSB_REPORT& rhs)

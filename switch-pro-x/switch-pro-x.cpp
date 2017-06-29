@@ -18,36 +18,64 @@
 #include "switch-pro-x.h"
 #include "ProControllerDevice.h"
 
-namespace {
+namespace
+{
     std::unordered_set<std::unique_ptr<ProControllerDevice>> proControllers;
     std::mutex controllerMapMutex;
 }
 
 void AddController(const tstring &path)
 {
-    std::lock_guard<std::mutex> lk(controllerMapMutex);
-    auto device = std::make_unique<ProControllerDevice>(path);
-    if (device->Valid()) {
-        std::cout << "FOUND PRO CONTROLLER: " << device.get() << std::endl;
-        proControllers.insert(std::move(device));
+    using std::cout;
+    using std::endl;
+    using std::lock_guard;
+    using std::mutex;
+    using std::make_unique;
+    using std::move;
+
+    lock_guard<mutex> lk(controllerMapMutex);
+
+    auto device = make_unique<ProControllerDevice>(path);
+
+    if (device->Valid())
+    {
+        cout << "FOUND PRO CONTROLLER: ";
+        *tcout << device->Path;
+        cout << endl;
+        proControllers.insert(move(device));
     }
 }
 
 void RemoveController(const tstring &path)
 {
-    std::lock_guard<std::mutex> lk(controllerMapMutex);
-    auto it = std::find_if(proControllers.begin(), proControllers.end(), [path](auto& c) { return tstring_icompare(c->Path, path); });
+    using std::cout;
+    using std::endl;
+    using std::lock_guard;
+    using std::mutex;
+    using std::find_if;
+
+    lock_guard<mutex> lk(controllerMapMutex);
+
+    auto it = find_if(proControllers.begin(), proControllers.end(), [path](const auto& c) { return tstring_icompare(c->Path, path); });
+
     if (it != proControllers.end())
     {
-        std::cout << "REMOVED PRO CONTROLLER: " << it->get() << std::endl;
+        cout << "REMOVED PRO CONTROLLER: ";
+        *tcout << (*it)->Path;
+        cout << endl;
         proControllers.erase(it);
     }
 }
 
 VOID CALLBACK XUSBCallback(VIGEM_TARGET target, UCHAR large_motor, UCHAR small_motor, UCHAR led_number)
 {
-    std::lock_guard<std::mutex> lk(controllerMapMutex);
-    auto it = std::find_if(proControllers.begin(), proControllers.end(), [target](auto& c) { return c->ViGEm_Target == target; });
+    using std::lock_guard;
+    using std::mutex;
+    using std::find_if;
+
+    lock_guard<mutex> lk(controllerMapMutex);
+
+    auto it = find_if(proControllers.begin(), proControllers.end(), [target](const auto& c) { return c->ViGEm_Target == target; });
     if (it != proControllers.end())
     {
         (*it)->HandleXUSBCallback(large_motor, small_motor, led_number);
@@ -56,13 +84,13 @@ VOID CALLBACK XUSBCallback(VIGEM_TARGET target, UCHAR large_motor, UCHAR small_m
 
 BOOL WINAPI ctrl_handler(DWORD _In_ event)
 {
+    using std::exit;
+
     if (event == CTRL_CLOSE_EVENT ||
         event == CTRL_C_EVENT ||
         event == CTRL_BREAK_EVENT)
     {
-        std::exit(0);
-
-        return TRUE;
+        exit(0);
     }
 
     return FALSE;
@@ -70,9 +98,13 @@ BOOL WINAPI ctrl_handler(DWORD _In_ event)
 
 int main()
 {
+    using std::cerr;
+    using std::endl;
+    using std::atexit;
+
     SetConsoleCtrlHandler(ctrl_handler, TRUE);
 
-    std::atexit([] {
+    atexit([] {
         // trigger deconstructors for all controllers
         proControllers.clear();
 
@@ -85,7 +117,7 @@ int main()
 
     if (!VIGEM_SUCCESS(ret))
     {
-        std::cerr << "error initializing ViGEm: " << std::hex << std::showbase << ret << std::endl;
+        cerr << "error initializing ViGEm: " << ret << endl;
 
         system("pause");
 

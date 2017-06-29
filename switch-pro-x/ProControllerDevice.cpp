@@ -6,7 +6,6 @@
 #include <chrono>
 #include <iostream>
 #include <memory>
-#include <vector>
 
 #include <cstring>
 
@@ -18,14 +17,11 @@
 
 namespace
 {
-    constexpr uint8_t EP_IN = 0x81;
-    constexpr uint8_t EP_OUT = 0x01;
+    constexpr std::uint8_t PACKET_TYPE_STATUS = 0x81;
+    constexpr std::uint8_t PACKET_TYPE_CONTROLLER_DATA = 0x30;
 
-    constexpr uint8_t PACKET_TYPE_STATUS = 0x81;
-    constexpr uint8_t PACKET_TYPE_CONTROLLER_DATA = 0x30;
-
-    constexpr uint8_t STATUS_TYPE_SERIAL = 0x01;
-    constexpr uint8_t STATUS_TYPE_INIT = 0x02;
+    constexpr std::uint8_t STATUS_TYPE_SERIAL = 0x01;
+    constexpr std::uint8_t STATUS_TYPE_INIT = 0x02;
 
     constexpr DWORD TIMEOUT = 500;
 
@@ -57,27 +53,27 @@ namespace
 #pragma pack(push, 1)
     typedef struct
     {
-        uint8_t type;
+        std::uint8_t type;
         union
         {
             struct
             {
-                uint8_t type;
-                uint8_t serial[8];
+                std::uint8_t type;
+                std::uint8_t serial[8];
             } status_response;
             struct
             {
-                uint8_t timestamp;
-                uint32_t buttons;
-                uint8_t analog[6];
+                std::uint8_t timestamp;
+                std::uint32_t buttons;
+                std::uint8_t analog[6];
             } controller_data;
-            uint8_t padding[63];
+            std::uint8_t padding[63];
         } data;
     } ProControllerPacket;
 #pragma pack(pop)
 }
 
-ProControllerDevice::ProControllerDevice(tstring path)
+ProControllerDevice::ProControllerDevice(const tstring& path)
     : counter(0)
     , Path(path)
     , handle(INVALID_HANDLE_VALUE)
@@ -87,12 +83,13 @@ ProControllerDevice::ProControllerDevice(tstring path)
 {
     using std::cerr;
     using std::endl;
+    using std::thread;
 
     handle = CreateFile(
         path.c_str(),
         GENERIC_WRITE | GENERIC_READ,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
-        NULL,
+        nullptr,
         OPEN_EXISTING,
         FILE_FLAG_OVERLAPPED,
         nullptr);
@@ -159,7 +156,7 @@ ProControllerDevice::ProControllerDevice(tstring path)
 
     if (!VIGEM_SUCCESS(ret))
     {
-        std::cerr << "error creating controller: " << std::hex << std::showbase << ret << std::endl;
+        cerr << "error creating controller: " << ret << endl;
 
         return;
     }
@@ -168,16 +165,16 @@ ProControllerDevice::ProControllerDevice(tstring path)
 
     if (!VIGEM_SUCCESS(ret))
     {
-        std::cerr << "error creating notification callback: " << std::hex << std::showbase << ret << std::endl;
+        cerr << "error creating notification callback: " << ret << endl;
         vigem_target_unplug(&ViGEm_Target);
 
         return;
     }
 
-    std::vector<uint8_t> data = { 0x80, 0x01 };
+    bytes data = { 0x80, 0x01 };
     WriteData(data);
 
-    read_thread = std::thread(&ProControllerDevice::ReadThread, this);
+    read_thread = thread(&ProControllerDevice::ReadThread, this);
 
     connected = true;
 }
@@ -185,10 +182,12 @@ ProControllerDevice::ProControllerDevice(tstring path)
 void ProControllerDevice::ReadThread()
 {
     using std::cout;
+    using std::cerr;
     using std::endl;
     using std::chrono::steady_clock;
     using std::chrono::milliseconds;
     using std::this_thread::sleep_for;
+    using std::uint8_t;
 
     UCHAR last_led = 0xFF;
     XUSB_REPORT last_report = { 0 };
@@ -196,26 +195,22 @@ void ProControllerDevice::ReadThread()
 
     while (!quitting)
     {
-        int size = 0;
-        sleep_for(milliseconds(8));
         auto data = ReadData();
-
-        ProControllerPacket *payload = reinterpret_cast<ProControllerPacket *>(data.data());
-
+        auto payload = reinterpret_cast<ProControllerPacket *>(data.data());
         auto now = steady_clock::now();
 
         if (first_control && now > last_rumble + milliseconds(100))
         {
             if (led_number != last_led)
             {
-                std::vector<uint8_t> buf = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, static_cast<uint8_t>(1 << led_number) };
+                bytes buf = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, static_cast<uint8_t>(1 << led_number) };
                 WriteData(buf);
 
                 last_led = led_number;
             }
             else
             {
-                std::vector<uint8_t> buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
+                bytes buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
 
                 if (large_motor != 0)
                 {
@@ -242,13 +237,13 @@ void ProControllerDevice::ReadThread()
             {
             case STATUS_TYPE_SERIAL:
             {
-                std::vector<uint8_t> payload = { 0x80, 0x02 };
+                bytes payload = { 0x80, 0x02 };
                 WriteData(payload);
                 break;
             }
             case STATUS_TYPE_INIT:
             {
-                std::vector<uint8_t> payload = { 0x80, 0x04 };
+                bytes payload = { 0x80, 0x04 };
                 WriteData(payload);
                 break;
             }
@@ -262,7 +257,7 @@ void ProControllerDevice::ReadThread()
 
             if (!first_control)
             {
-                last_rumble = std::chrono::steady_clock::now();
+                last_rumble = steady_clock::now();
                 first_control = true;
             }
 
@@ -344,7 +339,7 @@ void ProControllerDevice::ReadThread()
 
                     if (!VIGEM_SUCCESS(ret))
                     {
-                        std::cerr << "error sending report: " << std::hex << std::showbase << ret << std::endl;
+                        cerr << "error sending report: " << ret << endl;
 
                         quitting = true;
                     }
@@ -358,17 +353,17 @@ void ProControllerDevice::ReadThread()
         }
     }
 
-    sleep_for(std::chrono::milliseconds(100));
+    sleep_for(milliseconds(100));
 
     {
-        std::vector<uint8_t> buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
+        bytes buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
         WriteData(buf);
     }
 
-    sleep_for(std::chrono::milliseconds(100));
+    sleep_for(milliseconds(100));
 
     {
-        std::vector<uint8_t> buf = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 0x00 };
+        bytes buf = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 0x00 };
         WriteData(buf);
     }
 }
@@ -398,30 +393,31 @@ bool ProControllerDevice::Valid() {
     return connected;
 }
 
-std::vector<uint8_t> ProControllerDevice::ReadData()
+ProControllerDevice::bytes ProControllerDevice::ReadData()
 {
     using std::cerr;
     using std::endl;
 
-    std::vector<uint8_t> buf(input_size);
+    bytes buf(input_size);
 
     DWORD bytesRead = 0;
     OVERLAPPED ol = { 0 };
-    ol.hEvent = CreateEvent(nullptr, FALSE, FALSE, L"");
+    ol.hEvent = CreateEvent(nullptr, FALSE, FALSE, TEXT(""));
 
     if (!ReadFile(handle, buf.data(), static_cast<DWORD>(buf.size()), &bytesRead, &ol))
     {
-        DWORD err = GetLastError();
+        auto err = GetLastError();
 
         if (err == ERROR_IO_PENDING)
         {
-            DWORD waitObject = WaitForSingleObject(ol.hEvent, TIMEOUT);
+            auto waitObject = WaitForSingleObject(ol.hEvent, TIMEOUT);
 
             if (waitObject == WAIT_OBJECT_0)
             {
                 if (!GetOverlappedResult(handle, &ol, &bytesRead, TRUE))
                 {
                     auto err = GetLastError();
+
                     if (CheckIOError(err))
                     {
                         cerr << "Read failed (" << err << ")" << endl;
@@ -458,16 +454,18 @@ std::vector<uint8_t> ProControllerDevice::ReadData()
     return buf;
 }
 
-void ProControllerDevice::WriteData(const std::vector<uint8_t>& data)
+void ProControllerDevice::WriteData(const bytes& data)
 {
     using std::cerr;
     using std::endl;
+    using std::copy;
 
-    std::vector<uint8_t> buf;
+    bytes buf;
+
     if (data.size() < output_size)
     {
         buf.resize(output_size);
-        std::copy(data.begin(), data.end(), buf.begin());
+        copy(data.begin(), data.end(), buf.begin());
     }
     else
     {
@@ -476,19 +474,20 @@ void ProControllerDevice::WriteData(const std::vector<uint8_t>& data)
 
     DWORD tmp;
     OVERLAPPED ol = { 0 };
-    ol.hEvent = CreateEvent(nullptr, FALSE, FALSE, L"");
+    ol.hEvent = CreateEvent(nullptr, FALSE, FALSE, TEXT(""));
 
     if (!WriteFile(handle, buf.data(), static_cast<DWORD>(buf.size()), &tmp, &ol))
     {
-        DWORD err = GetLastError();
+        auto err = GetLastError();
 
         if (err == ERROR_IO_PENDING)
         {
-            DWORD waitObject = WaitForSingleObject(ol.hEvent, TIMEOUT);
+            auto waitObject = WaitForSingleObject(ol.hEvent, TIMEOUT);
 
             if (waitObject == WAIT_OBJECT_0) {
                 if (!GetOverlappedResult(handle, &ol, &tmp, TRUE)) {
                     auto err = GetLastError();
+
                     if (CheckIOError(err))
                     {
                         cerr << "Write failed (" << GetLastError() << ")" << endl;

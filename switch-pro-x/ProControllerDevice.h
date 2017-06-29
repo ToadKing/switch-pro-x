@@ -13,9 +13,12 @@
 
 #include "common.h"
 
-class ProControllerDevice {
+class ProControllerDevice
+{
+    typedef std::vector<std::uint8_t> bytes;
+
 public:
-    ProControllerDevice(tstring Path);
+    ProControllerDevice(const tstring& path);
     ~ProControllerDevice();
 
     bool Valid();
@@ -27,11 +30,11 @@ public:
 
 private:
     void ReadThread();
-    std::vector<uint8_t> ReadData();
-    void WriteData(const std::vector<uint8_t>& data);
+    bytes ReadData();
+    void WriteData(const bytes& data);
     bool CheckIOError(DWORD err);
 
-    uint8_t counter;
+    std::uint8_t counter;
     HANDLE handle;
     USHORT output_size;
     USHORT input_size;
@@ -45,11 +48,3 @@ private:
     std::atomic<bool> quitting;
     std::thread read_thread;
 };
-
-namespace std {
-    template <> struct hash<ProControllerDevice> {
-        size_t operator()(const ProControllerDevice& x) const {
-            return reinterpret_cast<size_t>(&x);
-        }
-    };
-}
