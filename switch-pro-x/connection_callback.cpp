@@ -56,7 +56,7 @@ namespace
         switch (msg) {
         case WM_DEVICECHANGE:
         {
-            auto b = (PDEV_BROADCAST_DEVICEINTERFACE)lParam;
+            auto b = reinterpret_cast<PDEV_BROADCAST_DEVICEINTERFACE>(lParam);
 
             switch (wParam) {
             case DBT_DEVICEARRIVAL:
