@@ -148,9 +148,9 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
 
     VIGEM_TARGET_INIT(&ViGEm_Target);
 
-    // We don't want to match the libusb driver again, don't set vid/pid and use the default one from ViGEm
-    //vigem_target_set_vid(&ViGEm_Target, PRO_CONTROLLER_VID);
-    //vigem_target_set_pid(&ViGEm_Target, PRO_CONTROLLER_PID);
+    // xinput controllers aren't HID so we don't have to worry about HidGuardian matching it again
+    vigem_target_set_vid(&ViGEm_Target, PRO_CONTROLLER_VID);
+    vigem_target_set_pid(&ViGEm_Target, PRO_CONTROLLER_PID);
 
     auto ret = vigem_target_plugin(Xbox360Wired, &ViGEm_Target);
 
