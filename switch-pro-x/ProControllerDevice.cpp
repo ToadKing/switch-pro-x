@@ -195,9 +195,9 @@ void ProControllerDevice::ReadThread()
 
     while (!quitting)
     {
-        auto data = ReadData();
-        auto payload = reinterpret_cast<ProControllerPacket *>(data.data());
-        auto now = steady_clock::now();
+        const auto data = ReadData();
+        const auto hid_payload = reinterpret_cast<const ProControllerPacket *>(data.data());
+        const auto now = steady_clock::now();
 
         if (first_control && now > last_rumble + milliseconds(100))
         {
@@ -229,11 +229,11 @@ void ProControllerDevice::ReadThread()
             last_rumble = now;
         }
 
-        switch (payload->type)
+        switch (hid_payload->type)
         {
         case PACKET_TYPE_STATUS:
         {
-            switch (payload->data.status_response.type)
+            switch (hid_payload->data.status_response.type)
             {
             case STATUS_TYPE_SERIAL:
             {
@@ -252,8 +252,8 @@ void ProControllerDevice::ReadThread()
         }
         case PACKET_TYPE_CONTROLLER_DATA:
         {
-            const auto analog = payload->data.controller_data.analog;
-            const auto buttons = payload->data.controller_data.buttons;
+            const auto& analog = hid_payload->data.controller_data.analog;
+            const auto& buttons = hid_payload->data.controller_data.buttons;
 
             if (!first_control)
             {
@@ -356,6 +356,7 @@ void ProControllerDevice::ReadThread()
     sleep_for(milliseconds(100));
 
     {
+        // stop haptic feedback
         bytes buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
         WriteData(buf);
     }
@@ -363,6 +364,7 @@ void ProControllerDevice::ReadThread()
     sleep_for(milliseconds(100));
 
     {
+        // turn off LED
         bytes buf = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, 0x00 };
         WriteData(buf);
     }
@@ -406,9 +408,9 @@ ProControllerDevice::bytes ProControllerDevice::ReadData()
 
     if (!ReadFile(handle, buf.data(), static_cast<DWORD>(buf.size()), &bytesRead, &ol))
     {
-        auto err = GetLastError();
+        auto read_err = GetLastError();
 
-        if (err == ERROR_IO_PENDING)
+        if (read_err == ERROR_IO_PENDING)
         {
             auto waitObject = WaitForSingleObject(ol.hEvent, TIMEOUT);
 
@@ -440,9 +442,9 @@ ProControllerDevice::bytes ProControllerDevice::ReadData()
         }
         else
         {
-            if (CheckIOError(err))
+            if (CheckIOError(read_err))
             {
-                cerr << "Read failed (" << err << ")" << endl;
+                cerr << "Read failed (" << read_err << ")" << endl;
             }
         }
     }
@@ -478,9 +480,9 @@ void ProControllerDevice::WriteData(const bytes& data)
 
     if (!WriteFile(handle, buf.data(), static_cast<DWORD>(buf.size()), &tmp, &ol))
     {
-        auto err = GetLastError();
+        auto write_err = GetLastError();
 
-        if (err == ERROR_IO_PENDING)
+        if (write_err == ERROR_IO_PENDING)
         {
             auto waitObject = WaitForSingleObject(ol.hEvent, TIMEOUT);
 
@@ -510,9 +512,9 @@ void ProControllerDevice::WriteData(const bytes& data)
         }
         else
         {
-            if (CheckIOError(err))
+            if (CheckIOError(write_err))
             {
-                cerr << "Write failed (" << err << ")" << endl;
+                cerr << "Write failed (" << write_err << ")" << endl;
             }
         }
     }
@@ -526,7 +528,9 @@ void ProControllerDevice::HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_mo
     using std::endl;
 
 #ifdef PRO_CONTROLLER_DEBUG_OUTPUT
-    cout << "XUSB CALLBACK (" << this << ") LARGE MOTOR: " << +_large_motor << ", SMALL MOTOR: " << +_small_motor << ", LED: " << +_led_number << endl;
+    cout << "XUSB CALLBACK (";
+    *tcout << Path;
+    cout << ") LARGE MOTOR: " << +_large_motor << ", SMALL MOTOR: " << +_small_motor << ", LED: " << +_led_number << endl;
 #endif
 
     large_motor = _large_motor;
