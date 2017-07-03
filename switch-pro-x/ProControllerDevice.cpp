@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <limits>
 #include <memory>
 
 #include <cstring>
@@ -401,9 +402,12 @@ void ProControllerDevice::ScaleJoystick(std::int16_t& x, std::int16_t& y)
     using std::int_fast32_t;
     using std::min;
     using std::max;
+    using std::numeric_limits;
 
-    constexpr int_fast32_t DST_MIN = INT16_MIN;
-    constexpr int_fast32_t DST_MAX = INT16_MAX;
+    typedef numeric_limits<int16_t> int16_limts;
+
+    constexpr int_fast32_t DST_MIN = int16_limts::min();
+    constexpr int_fast32_t DST_MAX = int16_limts::max();
     constexpr int_fast32_t DST_RNG = DST_MAX - DST_MIN;
 
     constexpr int_fast32_t SRC_X_MIN = -100;
