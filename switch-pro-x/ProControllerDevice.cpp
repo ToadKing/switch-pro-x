@@ -405,8 +405,7 @@ void ProControllerDevice::ScaleJoystick(std::int16_t& x, std::int16_t& y)
 {
     using std::int16_t;
     using std::int_fast32_t;
-    using std::min;
-    using std::max;
+    using std::clamp;
     using std::numeric_limits;
 
     typedef numeric_limits<int16_t> int16_limts;
@@ -426,8 +425,8 @@ void ProControllerDevice::ScaleJoystick(std::int16_t& x, std::int16_t& y)
     auto new_x = (((x - SRC_X_MIN) * DST_RNG) / SRC_X_RNG) + DST_MIN;
     auto new_y = (((y - SRC_Y_MIN) * DST_RNG) / SRC_Y_RNG) + DST_MIN;
 
-    x = static_cast<int16_t>(min(DST_MAX, max(DST_MIN, new_x)));
-    y = static_cast<int16_t>(min(DST_MAX, max(DST_MIN, new_y)));
+    x = static_cast<int16_t>(clamp(new_x, DST_MIN, DST_MAX));
+    y = static_cast<int16_t>(clamp(new_y, DST_MIN, DST_MAX));
 }
 
 bool ProControllerDevice::Valid() {
