@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -30,7 +31,7 @@ public:
 
 private:
     void ReadThread();
-    bytes ReadData();
+    std::optional<bytes> ReadData();
     void WriteData(const bytes& data);
     bool CheckIOError(DWORD err);
     void ScaleJoystick(std::int16_t& x, std::int16_t& y);

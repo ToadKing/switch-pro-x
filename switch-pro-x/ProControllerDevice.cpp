@@ -9,8 +9,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
-
-#include <cstring>
+#include <optional>
 
 #include "common.h"
 #include "ProControllerDevice.h"
@@ -220,7 +219,13 @@ void ProControllerDevice::ReadThread()
     while (!quitting)
     {
         const auto data = ReadData();
-        const auto hid_payload = reinterpret_cast<const ProControllerPacket *>(data.data());
+
+        if (!data)
+        {
+            continue;
+        }
+
+        const auto hid_payload = reinterpret_cast<const ProControllerPacket *>(data->data());
         const auto now = steady_clock::now();
 
         if (first_control && now > last_rumble + milliseconds(100))
@@ -429,7 +434,7 @@ bool ProControllerDevice::Valid() {
     return connected;
 }
 
-ProControllerDevice::bytes ProControllerDevice::ReadData()
+std::optional<ProControllerDevice::bytes> ProControllerDevice::ReadData()
 {
     using std::cerr;
     using std::endl;
@@ -458,6 +463,8 @@ ProControllerDevice::bytes ProControllerDevice::ReadData()
                     {
                         cerr << "Read failed (" << err << ")" << endl;
                     }
+
+                    return {};
                 }
             }
             else
@@ -472,6 +479,8 @@ ProControllerDevice::bytes ProControllerDevice::ReadData()
                     handles[1] = ol.hEvent;
                     WaitForMultipleObjects(2, handles, FALSE, INFINITE);
                 }
+
+                return {};
             }
         }
         else
@@ -480,6 +489,8 @@ ProControllerDevice::bytes ProControllerDevice::ReadData()
             {
                 cerr << "Read failed (" << read_err << ")" << endl;
             }
+
+            return {};
         }
     }
 
