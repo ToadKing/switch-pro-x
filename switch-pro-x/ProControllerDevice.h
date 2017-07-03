@@ -33,6 +33,7 @@ private:
     bytes ReadData();
     void WriteData(const bytes& data);
     bool CheckIOError(DWORD err);
+    void ScaleJoystick(std::int16_t& x, std::int16_t& y);
 
     std::uint8_t counter;
     HANDLE handle;

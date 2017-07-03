@@ -1,8 +1,10 @@
+#define NOMINMAX
 #include <Windows.h>
 #include <hidsdi.h>
 
 #include <ViGEmUM.h>
 
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <memory>
@@ -148,9 +150,9 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
 
     VIGEM_TARGET_INIT(&ViGEm_Target);
 
-    // xinput controllers aren't HID so we don't have to worry about HidGuardian matching it again
-    vigem_target_set_vid(&ViGEm_Target, PRO_CONTROLLER_VID);
-    vigem_target_set_pid(&ViGEm_Target, PRO_CONTROLLER_PID);
+    // use driver default vid/pid so we don't match recursively
+    //vigem_target_set_vid(&ViGEm_Target, PRO_CONTROLLER_VID);
+    //vigem_target_set_pid(&ViGEm_Target, PRO_CONTROLLER_PID);
 
     auto ret = vigem_target_plugin(Xbox360Wired, &ViGEm_Target);
 
@@ -177,6 +179,27 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
     read_thread = thread(&ProControllerDevice::ReadThread, this);
 
     connected = true;
+}
+
+ProControllerDevice::~ProControllerDevice()
+{
+    quitting = true;
+
+    if (read_thread.joinable())
+    {
+        read_thread.join();
+    }
+
+    if (handle != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(handle);
+    }
+
+    if (connected)
+    {
+        //vigem_unregister_xusb_notification(XUSBCallback);
+        vigem_target_unplug(&ViGEm_Target);
+    }
 }
 
 void ProControllerDevice::ReadThread()
@@ -324,11 +347,13 @@ void ProControllerDevice::ReadThread()
             report.bRightTrigger = !!(buttons & SWITCH_BUTTON_MASK_ZR) * 0xFF;
             report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_THUMB_R) ? XUSB_GAMEPAD_RIGHT_THUMB : 0;
 
-            // 257 is not a typo, that's so we get the full range from 0x0000 to 0xffff
-            report.sThumbLX = lx * 257;
-            report.sThumbLY = ly * 257;
-            report.sThumbRX= rx * 257;
-            report.sThumbRY = ry * 257;
+            report.sThumbLX = lx;
+            report.sThumbLY = ly;
+            report.sThumbRX = rx;
+            report.sThumbRY = ry;
+
+            ScaleJoystick(report.sThumbLX, report.sThumbLY);
+            ScaleJoystick(report.sThumbRX, report.sThumbRY);
 
             if (report != last_report)
             {
@@ -370,25 +395,30 @@ void ProControllerDevice::ReadThread()
     }
 }
 
-ProControllerDevice::~ProControllerDevice()
+void ProControllerDevice::ScaleJoystick(std::int16_t& x, std::int16_t& y)
 {
-    quitting = true;
+    using std::int16_t;
+    using std::int_fast32_t;
+    using std::min;
+    using std::max;
 
-    if (read_thread.joinable())
-    {
-        read_thread.join();
-    }
+    constexpr int_fast32_t DST_MIN = INT16_MIN;
+    constexpr int_fast32_t DST_MAX = INT16_MAX;
+    constexpr int_fast32_t DST_RNG = DST_MAX - DST_MIN;
 
-    if (handle != INVALID_HANDLE_VALUE)
-    {
-        CloseHandle(handle);
-    }
+    constexpr int_fast32_t SRC_X_MIN = -100;
+    constexpr int_fast32_t SRC_X_MAX = 85;
+    constexpr int_fast32_t SRC_X_RNG = SRC_X_MAX - SRC_X_MIN;
 
-    if (connected)
-    {
-        vigem_unregister_xusb_notification(XUSBCallback);
-        vigem_target_unplug(&ViGEm_Target);
-    }
+    constexpr int_fast32_t SRC_Y_MIN = -100;
+    constexpr int_fast32_t SRC_Y_MAX = 90;
+    constexpr int_fast32_t SRC_Y_RNG = SRC_Y_MAX - SRC_Y_MIN;
+
+    auto new_x = (((x - SRC_X_MIN) * DST_RNG) / SRC_X_RNG) + DST_MIN;
+    auto new_y = (((y - SRC_Y_MIN) * DST_RNG) / SRC_Y_RNG) + DST_MIN;
+
+    x = static_cast<int16_t>(min(DST_MAX, max(DST_MIN, new_x)));
+    y = static_cast<int16_t>(min(DST_MAX, max(DST_MIN, new_y)));
 }
 
 bool ProControllerDevice::Valid() {

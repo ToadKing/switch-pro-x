@@ -1,11 +1,14 @@
+#define NOMINMAX
 #include <Windows.h>
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
-#include <unordered_set>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
+#include <unordered_set>
 
 #include <cstdint>
 #include <cstdlib>
@@ -101,12 +104,21 @@ int main()
     using std::cerr;
     using std::endl;
     using std::atexit;
+    using std::lock_guard;
+    using std::mutex;
+    using std::system;
+    using std::this_thread::sleep_for;
+    using std::chrono::hours;
 
     SetConsoleCtrlHandler(ctrl_handler, TRUE);
 
     atexit([] {
         // trigger deconstructors for all controllers
-        proControllers.clear();
+        {
+            lock_guard<mutex> lk(controllerMapMutex);
+
+            proControllers.clear();
+        }
 
         vigem_shutdown();
 
@@ -128,7 +140,9 @@ int main()
 
     SetupDeviceNotifications();
 
-    Sleep(INFINITE);
-
-    return 0;
+    // sleep forever
+    for (;;)
+    {
+        sleep_for(hours::max());
+    }
 }
