@@ -611,6 +611,7 @@ void ProControllerDevice::HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_mo
     {
         lock_guard<mutex> lk(rumble_mutex);
 
+        // avoid rumble effects being lost because they toggle on and off too fast
         if (_large_motor == 0 && motor_large_waiting)
         {
             motor_large_will_empty = true;
