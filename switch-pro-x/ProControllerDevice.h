@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <mutex>
 #include <optional>
 #include <thread>
 #include <vector>
@@ -43,8 +44,13 @@ private:
     std::chrono::steady_clock::time_point last_rumble;
 
     std::atomic<UCHAR> led_number;
-    std::atomic<UCHAR> large_motor;
-    std::atomic<UCHAR> small_motor;
+    UCHAR large_motor;
+    UCHAR small_motor;
+    bool motor_large_waiting;
+    bool motor_small_waiting;
+    bool motor_large_will_empty;
+    bool motor_small_will_empty;
+    std::mutex rumble_mutex;
 
     bool connected;
     std::atomic<bool> quitting;

@@ -9,6 +9,7 @@
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <optional>
 
 #include "common.h"
@@ -82,6 +83,7 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
     , quitting(false)
     , last_rumble()
     , led_number(0xFF)
+    , rumble_mutex()
 {
     using std::cerr;
     using std::endl;
@@ -211,6 +213,8 @@ void ProControllerDevice::ReadThread()
     using std::chrono::milliseconds;
     using std::this_thread::sleep_for;
     using std::uint8_t;
+    using std::lock_guard;
+    using std::mutex;
 
     UCHAR last_led = 0xFF;
     XUSB_REPORT last_report = { 0 };
@@ -239,17 +243,42 @@ void ProControllerDevice::ReadThread()
             }
             else
             {
-                bytes buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
+                bytes buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00 };
 
-                if (large_motor != 0)
                 {
-                    buf[2] = buf[6] = 0x08;
-                    buf[3] = buf[7] = large_motor;
-                }
-                else if (small_motor != 0)
-                {
-                    buf[2] = buf[6] = 0x10;
-                    buf[3] = buf[7] = small_motor;
+                    lock_guard<mutex> lk(rumble_mutex);
+
+                    // discovered through trial and error, seem to be good enough
+                    // NOTE: xinput left/right motors are actually functionally different, not for directional rumble
+                    if (large_motor != 0)
+                    {
+                        buf[2] = buf[6] = 0x80;
+                        buf[3] = buf[7] = 0x20;
+                        buf[4] = buf[8] = 0x62;
+                        buf[5] = buf[9] = large_motor >> 2;
+                    }
+                    else if (small_motor != 0)
+                    {
+                        buf[2] = buf[6] = 0x98;
+                        buf[3] = buf[7] = 0x20;
+                        buf[4] = buf[8] = 0x62;
+                        buf[5] = buf[9] = small_motor >> 2;
+                    }
+
+                    if (motor_large_will_empty)
+                    {
+                        large_motor = 0;
+                        motor_large_will_empty = false;
+                    }
+
+                    if (motor_small_will_empty)
+                    {
+                        small_motor = 0;
+                        motor_small_will_empty = false;
+                    }
+
+                    motor_large_waiting = false;
+                    motor_small_waiting = false;
                 }
 
                 WriteData(buf);
@@ -388,7 +417,7 @@ void ProControllerDevice::ReadThread()
 
     {
         // stop haptic feedback
-        bytes buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x40, 0x40, 0x80, 0x00, 0x40, 0x40 };
+        bytes buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00 };
         WriteData(buf);
     }
 
@@ -570,6 +599,8 @@ void ProControllerDevice::HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_mo
 {
     using std::cout;
     using std::endl;
+    using std::lock_guard;
+    using std::mutex;
 
 #ifdef PRO_CONTROLLER_DEBUG_OUTPUT
     cout << "XUSB CALLBACK (";
@@ -577,8 +608,32 @@ void ProControllerDevice::HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_mo
     cout << ") LARGE MOTOR: " << +_large_motor << ", SMALL MOTOR: " << +_small_motor << ", LED: " << +_led_number << endl;
 #endif
 
-    large_motor = _large_motor;
-    small_motor = _small_motor;
+    {
+        lock_guard<mutex> lk(rumble_mutex);
+
+        if (_large_motor == 0 && motor_large_waiting)
+        {
+            motor_large_will_empty = true;
+        }
+        else
+        {
+            large_motor = _large_motor;
+            motor_large_will_empty = false;
+        }
+        motor_large_waiting = true;
+
+        if (_small_motor == 0 && motor_small_waiting)
+        {
+            motor_small_will_empty = true;
+        }
+        else
+        {
+            small_motor = _small_motor;
+            motor_small_will_empty = false;
+        }
+        motor_small_waiting = true;
+    }
+
     led_number = _led_number;
 }
 
