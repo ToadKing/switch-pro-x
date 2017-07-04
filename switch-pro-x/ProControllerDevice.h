@@ -17,8 +17,6 @@
 
 class ProControllerDevice
 {
-    typedef std::vector<std::uint8_t> bytes;
-
 public:
     ProControllerDevice(const tstring& path);
     ~ProControllerDevice();
@@ -31,6 +29,8 @@ public:
     const tstring Path;
 
 private:
+    typedef std::vector<std::uint8_t> bytes;
+
     void ReadThread();
     std::optional<bytes> ReadData();
     void WriteData(const bytes& data);
