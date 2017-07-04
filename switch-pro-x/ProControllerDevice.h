@@ -50,7 +50,7 @@ private:
     bool motor_small_waiting;
     bool motor_large_will_empty;
     bool motor_small_will_empty;
-    std::mutex rumble_mutex;
+    spinlock rumble_lock;
 
     bool connected;
     std::atomic<bool> quitting;

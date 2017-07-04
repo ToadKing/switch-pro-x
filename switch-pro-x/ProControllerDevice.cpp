@@ -83,7 +83,7 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
     , quitting(false)
     , last_rumble()
     , led_number(0xFF)
-    , rumble_mutex()
+    , rumble_lock()
 {
     using std::cerr;
     using std::endl;
@@ -246,7 +246,7 @@ void ProControllerDevice::ReadThread()
                 bytes buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00 };
 
                 {
-                    lock_guard<mutex> lk(rumble_mutex);
+                    lock_guard<spinlock> lk(rumble_lock);
 
                     // discovered through trial and error, seem to be good enough
                     // NOTE: xinput left/right motors are actually functionally different, not for directional rumble
@@ -609,7 +609,7 @@ void ProControllerDevice::HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_mo
 #endif
 
     {
-        lock_guard<mutex> lk(rumble_mutex);
+        lock_guard<spinlock> lk(rumble_lock);
 
         // avoid rumble effects being lost because they toggle on and off too fast
         if (_large_motor == 0 && motor_large_waiting)

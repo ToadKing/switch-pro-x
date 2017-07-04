@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <string>
 #include <iostream>
 #include <algorithm>
@@ -66,4 +67,32 @@ namespace
     {
         return !(lhs == rhs);
     }
+
+    class spinlock
+    {
+    public:
+        void lock()
+        {
+            using std::memory_order_acquire;
+
+            while (lck.test_and_set(memory_order_acquire));
+        }
+
+        void unlock()
+        {
+            using std::memory_order_release;
+
+            lck.clear(memory_order_release);
+        }
+
+        bool try_lock()
+        {
+            using std::memory_order_acquire;
+
+            return !lck.test_and_set(memory_order_acquire);
+        }
+
+    private:
+        std::atomic_flag lck = ATOMIC_FLAG_INIT;
+    };
 }
