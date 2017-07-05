@@ -20,7 +20,7 @@
 
 namespace
 {
-    constexpr LPCTSTR BLUETOOTH_HID_GUID = TEXT("{00001124-0000-1000-8000-00805F9B34FB}");
+    const tstring BLUETOOTH_HID_GUID(TEXT("{00001124-0000-1000-8000-00805F9B34FB}"));
 
     constexpr std::uint8_t PACKET_TYPE_STATUS = 0x81;
     constexpr std::uint8_t PACKET_TYPE_CONTROLLER_DATA = 0x30;
@@ -191,8 +191,7 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
     input_size = caps.InputReportByteLength;
 
     // search for bluetooth hid GUID in path
-    const tstring BT_HID_GUID(BLUETOOTH_HID_GUID);
-    is_bluetooth = tstring_ifind(Path, BT_HID_GUID) != tstring::npos;
+    is_bluetooth = tstring_ifind(Path, BLUETOOTH_HID_GUID) != tstring::npos;
 
     VIGEM_TARGET_INIT(&ViGEm_Target);
 
