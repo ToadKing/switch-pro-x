@@ -192,7 +192,7 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
 
     // search for bluetooth hid GUID in path
     const tstring BT_HID_GUID(BLUETOOTH_HID_GUID);
-    is_bluetooth = tstring_ifind(Path, BT_HID_GUID) != Path.end();
+    is_bluetooth = tstring_ifind(Path, BT_HID_GUID) != tstring::npos;
 
     VIGEM_TARGET_INIT(&ViGEm_Target);
 
