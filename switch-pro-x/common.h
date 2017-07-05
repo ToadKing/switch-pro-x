@@ -13,10 +13,12 @@ namespace
 {
 #ifdef UNICODE
     typedef std::wstring tstring;
+    typedef std::wstring::const_iterator tstring_const_iterator;
     const auto tcout = &std::wcout;
     const auto tcerr = &std::wcerr;
 #else
     typedef std::string tstring;
+    typedef std::string::const_iterator tstring_const_iterator;
     const auto tcout = &std::cout;
     const auto tcerr = &std::cerr;
 #endif
@@ -36,6 +38,16 @@ namespace
         }
 
         return equal(lhs.begin(), lhs.end(), rhs.begin(), [](const auto& lhs, const auto& rhs) { return tolower(lhs) == tolower(rhs); });
+    }
+
+    inline tstring_const_iterator tstring_ifind(const tstring& lhs, const tstring& rhs)
+    {
+        using std::search;
+        using std::tolower;
+
+        auto it = search(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), [](const auto& lhs, const auto& rhs) { return toupper(lhs) == toupper(rhs); });
+
+        return it;
     }
 
     inline bool operator==(const XUSB_REPORT& lhs, const XUSB_REPORT& rhs)

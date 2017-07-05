@@ -20,6 +20,8 @@
 
 namespace
 {
+    constexpr LPCTSTR BLUETOOTH_HID_GUID = TEXT("{00001124-0000-1000-8000-00805F9B34FB}");
+
     constexpr std::uint8_t PACKET_TYPE_STATUS = 0x81;
     constexpr std::uint8_t PACKET_TYPE_CONTROLLER_DATA = 0x30;
 
@@ -29,31 +31,52 @@ namespace
     constexpr DWORD TIMEOUT = 500;
 
     enum {
-        SWITCH_BUTTON_MASK_A = 0x00000800,
-        SWITCH_BUTTON_MASK_B = 0x00000400,
-        SWITCH_BUTTON_MASK_X = 0x00000200,
-        SWITCH_BUTTON_MASK_Y = 0x00000100,
+        SWITCH_BUTTON_USB_MASK_A = 0x00000800,
+        SWITCH_BUTTON_USB_MASK_B = 0x00000400,
+        SWITCH_BUTTON_USB_MASK_X = 0x00000200,
+        SWITCH_BUTTON_USB_MASK_Y = 0x00000100,
 
-        SWITCH_BUTTON_MASK_DPAD_UP = 0x02000000,
-        SWITCH_BUTTON_MASK_DPAD_DOWN = 0x01000000,
-        SWITCH_BUTTON_MASK_DPAD_LEFT = 0x08000000,
-        SWITCH_BUTTON_MASK_DPAD_RIGHT = 0x04000000,
+        SWITCH_BUTTON_USB_MASK_DPAD_UP = 0x02000000,
+        SWITCH_BUTTON_USB_MASK_DPAD_DOWN = 0x01000000,
+        SWITCH_BUTTON_USB_MASK_DPAD_LEFT = 0x08000000,
+        SWITCH_BUTTON_USB_MASK_DPAD_RIGHT = 0x04000000,
 
-        SWITCH_BUTTON_MASK_PLUS = 0x00020000,
-        SWITCH_BUTTON_MASK_MINUS = 0x00010000,
-        SWITCH_BUTTON_MASK_HOME = 0x00100000,
-        SWITCH_BUTTON_MASK_SHARE = 0x00200000,
+        SWITCH_BUTTON_USB_MASK_PLUS = 0x00020000,
+        SWITCH_BUTTON_USB_MASK_MINUS = 0x00010000,
+        SWITCH_BUTTON_USB_MASK_HOME = 0x00100000,
+        SWITCH_BUTTON_USB_MASK_SHARE = 0x00200000,
 
-        SWITCH_BUTTON_MASK_L = 0x40000000,
-        SWITCH_BUTTON_MASK_ZL = 0x80000000,
-        SWITCH_BUTTON_MASK_THUMB_L = 0x00080000,
+        SWITCH_BUTTON_USB_MASK_L = 0x40000000,
+        SWITCH_BUTTON_USB_MASK_ZL = 0x80000000,
+        SWITCH_BUTTON_USB_MASK_THUMB_L = 0x00080000,
 
-        SWITCH_BUTTON_MASK_R = 0x00004000,
-        SWITCH_BUTTON_MASK_ZR = 0x00008000,
-        SWITCH_BUTTON_MASK_THUMB_R = 0x00040000,
+        SWITCH_BUTTON_USB_MASK_R = 0x00004000,
+        SWITCH_BUTTON_USB_MASK_ZR = 0x00008000,
+        SWITCH_BUTTON_USB_MASK_THUMB_R = 0x00040000,
     };
 
-#pragma pack(push, 1)
+    enum
+    {
+        SWITCH_BUTTON_BLUETOOTH_MASK_A = 0x0002,
+        SWITCH_BUTTON_BLUETOOTH_MASK_B = 0x0001,
+        SWITCH_BUTTON_BLUETOOTH_MASK_X = 0x0008,
+        SWITCH_BUTTON_BLUETOOTH_MASK_Y = 0x0004,
+
+        SWITCH_BUTTON_BLUETOOTH_MASK_PLUS = 0x0200,
+        SWITCH_BUTTON_BLUETOOTH_MASK_MINUS = 0x0100,
+        SWITCH_BUTTON_BLUETOOTH_MASK_HOME = 0x1000,
+        SWITCH_BUTTON_BLUETOOTH_MASK_SHARE = 0x2000,
+
+        SWITCH_BUTTON_BLUETOOTH_MASK_L = 0x0010,
+        SWITCH_BUTTON_BLUETOOTH_MASK_ZL = 0x0040,
+        SWITCH_BUTTON_BLUETOOTH_MASK_THUMB_L = 0x0400,
+
+        SWITCH_BUTTON_BLUETOOTH_MASK_R = 0x0020,
+        SWITCH_BUTTON_BLUETOOTH_MASK_ZR = 0x0080,
+        SWITCH_BUTTON_BLUETOOTH_MASK_THUMB_R = 0x0800,
+    };
+
+#pragma pack(push, 1) 
     typedef struct
     {
         std::uint8_t type;
@@ -72,8 +95,23 @@ namespace
             } controller_data;
             std::uint8_t padding[63];
         } data;
-    } ProControllerPacket;
-#pragma pack(pop)
+    } ProControllerUSBPacket;
+
+    typedef struct
+    {
+        std::uint8_t report_id;
+        union
+        {
+            struct
+            {
+                std::uint16_t buttons;
+                std::uint8_t hat;
+                std::uint16_t analog[4];
+            } controller_data;
+            std::uint8_t padding[361];
+        } data;
+    } ProControllerBluetoothPacket;
+#pragma pack(pop) 
 }
 
 ProControllerDevice::ProControllerDevice(const tstring& path)
@@ -84,6 +122,8 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
     , last_rumble()
     , led_number(0xFF)
     , rumble_lock()
+    , last_led(0xFF)
+    , last_report({ 0 })
 {
     using std::cerr;
     using std::endl;
@@ -150,6 +190,10 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
     output_size = caps.OutputReportByteLength;
     input_size = caps.InputReportByteLength;
 
+    // search for bluetooth hid GUID in path
+    const tstring BT_HID_GUID(BLUETOOTH_HID_GUID);
+    is_bluetooth = tstring_ifind(Path, BT_HID_GUID) != Path.end();
+
     VIGEM_TARGET_INIT(&ViGEm_Target);
 
     // use driver default vid/pid so we don't match recursively
@@ -175,10 +219,14 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
         return;
     }
 
-    bytes data = { 0x80, 0x01 };
-    WriteData(data);
-
-    read_thread = thread(&ProControllerDevice::ReadThread, this);
+    if (is_bluetooth)
+    {
+        read_thread = thread(&ProControllerDevice::BluetoothReadThread, this);
+    }
+    else
+    {
+        read_thread = thread(&ProControllerDevice::USBReadThread, this);
+    }
 
     connected = true;
 }
@@ -204,21 +252,20 @@ ProControllerDevice::~ProControllerDevice()
     }
 }
 
-void ProControllerDevice::ReadThread()
+void ProControllerDevice::USBReadThread()
 {
     using std::cout;
-    using std::cerr;
     using std::endl;
     using std::chrono::steady_clock;
-    using std::chrono::milliseconds;
-    using std::this_thread::sleep_for;
-    using std::uint8_t;
-    using std::lock_guard;
-    using std::mutex;
+    using std::int8_t;
+    using std::int_fast64_t;
 
-    UCHAR last_led = 0xFF;
-    XUSB_REPORT last_report = { 0 };
     bool first_control = false;
+
+    {
+        bytes data = { 0x80, 0x01 };
+        WriteData(data);
+    }
 
     while (!quitting)
     {
@@ -229,62 +276,11 @@ void ProControllerDevice::ReadThread()
             continue;
         }
 
-        const auto hid_payload = reinterpret_cast<const ProControllerPacket *>(data->data());
-        const auto now = steady_clock::now();
+        const auto hid_payload = reinterpret_cast<const ProControllerUSBPacket *>(data->data());
 
-        if (first_control && now > last_rumble + milliseconds(100))
+        if (first_control)
         {
-            if (led_number != last_led)
-            {
-                bytes buf = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, static_cast<uint8_t>(1 << led_number) };
-                WriteData(buf);
-
-                last_led = led_number;
-            }
-            else
-            {
-                bytes buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00 };
-
-                {
-                    lock_guard<spinlock> lk(rumble_lock);
-
-                    // discovered through trial and error, seem to be good enough
-                    // NOTE: xinput left/right motors are actually functionally different, not for directional rumble
-                    if (large_motor != 0)
-                    {
-                        buf[2] = buf[6] = 0x80;
-                        buf[3] = buf[7] = 0x20;
-                        buf[4] = buf[8] = 0x62;
-                        buf[5] = buf[9] = large_motor >> 2;
-                    }
-                    else if (small_motor != 0)
-                    {
-                        buf[2] = buf[6] = 0x98;
-                        buf[3] = buf[7] = 0x20;
-                        buf[4] = buf[8] = 0x62;
-                        buf[5] = buf[9] = small_motor >> 2;
-                    }
-
-                    if (motor_large_will_empty)
-                    {
-                        large_motor = 0;
-                        motor_large_will_empty = false;
-                    }
-
-                    if (motor_small_will_empty)
-                    {
-                        small_motor = 0;
-                        motor_small_will_empty = false;
-                    }
-
-                    motor_large_waiting = false;
-                    motor_small_waiting = false;
-                }
-
-                WriteData(buf);
-            }
-
-            last_rumble = now;
+            HandleLEDAndVibration();
         }
 
         switch (hid_payload->type)
@@ -310,43 +306,43 @@ void ProControllerDevice::ReadThread()
         }
         case PACKET_TYPE_CONTROLLER_DATA:
         {
-            const auto& analog = hid_payload->data.controller_data.analog;
-            const auto& buttons = hid_payload->data.controller_data.buttons;
-
             if (!first_control)
             {
                 last_rumble = steady_clock::now();
                 first_control = true;
             }
 
-            int8_t lx = static_cast<int8_t>(((analog[1] & 0x0F) << 4) | ((analog[0] & 0xF0) >> 4)) + 127;
+            const auto& analog = hid_payload->data.controller_data.analog;
+            const auto& buttons = hid_payload->data.controller_data.buttons;
+
+            int8_t lx = (((analog[1] & 0x0F) << 4) | ((analog[0] & 0xF0) >> 4)) + 127;
             int8_t ly = analog[2] + 127;
-            int8_t rx = static_cast<int8_t>(((analog[4] & 0x0F) << 4) | ((analog[3] & 0xF0) >> 4)) + 127;
+            int8_t rx = (((analog[4] & 0x0F) << 4) | ((analog[3] & 0xF0) >> 4)) + 127;
             int8_t ry = analog[5] + 127;
 
 #ifdef PRO_CONTROLLER_DEBUG_OUTPUT
-            cout << "A: " << !!(buttons & SWITCH_BUTTON_MASK_A) << ", ";
-            cout << "B: " << !!(buttons & SWITCH_BUTTON_MASK_B) << ", ";
-            cout << "X: " << !!(buttons & SWITCH_BUTTON_MASK_X) << ", ";
-            cout << "Y: " << !!(buttons & SWITCH_BUTTON_MASK_Y) << ", ";
+            cout << "A: " << !!(buttons & SWITCH_BUTTON_USB_MASK_A) << ", ";
+            cout << "B: " << !!(buttons & SWITCH_BUTTON_USB_MASK_B) << ", ";
+            cout << "X: " << !!(buttons & SWITCH_BUTTON_USB_MASK_X) << ", ";
+            cout << "Y: " << !!(buttons & SWITCH_BUTTON_USB_MASK_Y) << ", ";
 
-            cout << "DU: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_UP) << ", ";
-            cout << "DD: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_DOWN) << ", ";
-            cout << "DL: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_LEFT) << ", ";
-            cout << "DR: " << !!(buttons & SWITCH_BUTTON_MASK_DPAD_RIGHT) << ", ";
+            cout << "DU: " << !!(buttons & SWITCH_BUTTON_USB_MASK_DPAD_UP) << ", ";
+            cout << "DD: " << !!(buttons & SWITCH_BUTTON_USB_MASK_DPAD_DOWN) << ", ";
+            cout << "DL: " << !!(buttons & SWITCH_BUTTON_USB_MASK_DPAD_LEFT) << ", ";
+            cout << "DR: " << !!(buttons & SWITCH_BUTTON_USB_MASK_DPAD_RIGHT) << ", ";
 
-            cout << "P: " << !!(buttons & SWITCH_BUTTON_MASK_PLUS) << ", ";
-            cout << "M: " << !!(buttons & SWITCH_BUTTON_MASK_MINUS) << ", ";
-            cout << "H: " << !!(buttons & SWITCH_BUTTON_MASK_HOME) << ", ";
-            cout << "S: " << !!(buttons & SWITCH_BUTTON_MASK_SHARE) << ", ";
+            cout << "P: " << !!(buttons & SWITCH_BUTTON_USB_MASK_PLUS) << ", ";
+            cout << "M: " << !!(buttons & SWITCH_BUTTON_USB_MASK_MINUS) << ", ";
+            cout << "H: " << !!(buttons & SWITCH_BUTTON_USB_MASK_HOME) << ", ";
+            cout << "S: " << !!(buttons & SWITCH_BUTTON_USB_MASK_SHARE) << ", ";
 
-            cout << "L: " << !!(buttons & SWITCH_BUTTON_MASK_L) << ", ";
-            cout << "ZL: " << !!(buttons & SWITCH_BUTTON_MASK_ZL) << ", ";
-            cout << "TL: " << !!(buttons & SWITCH_BUTTON_MASK_THUMB_L) << ", ";
+            cout << "L: " << !!(buttons & SWITCH_BUTTON_USB_MASK_L) << ", ";
+            cout << "ZL: " << !!(buttons & SWITCH_BUTTON_USB_MASK_ZL) << ", ";
+            cout << "TL: " << !!(buttons & SWITCH_BUTTON_USB_MASK_THUMB_L) << ", ";
 
-            cout << "R: " << !!(buttons & SWITCH_BUTTON_MASK_R) << ", ";
-            cout << "ZR: " << !!(buttons & SWITCH_BUTTON_MASK_ZR) << ", ";
-            cout << "TR: " << !!(buttons & SWITCH_BUTTON_MASK_THUMB_R) << ", ";
+            cout << "R: " << !!(buttons & SWITCH_BUTTON_USB_MASK_R) << ", ";
+            cout << "ZR: " << !!(buttons & SWITCH_BUTTON_USB_MASK_ZR) << ", ";
+            cout << "TR: " << !!(buttons & SWITCH_BUTTON_USB_MASK_THUMB_R) << ", ";
 
             cout << "LX: " << +lx << ", ";
             cout << "LY: " << +ly << ", ";
@@ -360,58 +356,260 @@ void ProControllerDevice::ReadThread()
             XUSB_REPORT report = { 0 };
 
             // assign a/b/x/y so they match the positions on the xbox layout
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_A) ? XUSB_GAMEPAD_B : 0;
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_B) ? XUSB_GAMEPAD_A : 0;
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_X) ? XUSB_GAMEPAD_Y : 0;
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_Y) ? XUSB_GAMEPAD_X : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_A) ? XUSB_GAMEPAD_B : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_B) ? XUSB_GAMEPAD_A : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_X) ? XUSB_GAMEPAD_Y : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_Y) ? XUSB_GAMEPAD_X : 0;
 
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_DPAD_UP) ? XUSB_GAMEPAD_DPAD_UP : 0;
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_DPAD_DOWN) ? XUSB_GAMEPAD_DPAD_DOWN : 0;
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_DPAD_LEFT) ? XUSB_GAMEPAD_DPAD_LEFT : 0;
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_DPAD_RIGHT) ? XUSB_GAMEPAD_DPAD_RIGHT : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_DPAD_UP) ? XUSB_GAMEPAD_DPAD_UP : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_DPAD_DOWN) ? XUSB_GAMEPAD_DPAD_DOWN : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_DPAD_LEFT) ? XUSB_GAMEPAD_DPAD_LEFT : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_DPAD_RIGHT) ? XUSB_GAMEPAD_DPAD_RIGHT : 0;
 
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_PLUS) ? XUSB_GAMEPAD_START : 0;
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_MINUS) ? XUSB_GAMEPAD_BACK : 0;
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_HOME) ? XUSB_GAMEPAD_GUIDE : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_PLUS) ? XUSB_GAMEPAD_START : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_MINUS) ? XUSB_GAMEPAD_BACK : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_HOME) ? XUSB_GAMEPAD_GUIDE : 0;
 
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_L) ? XUSB_GAMEPAD_LEFT_SHOULDER : 0;
-            report.bLeftTrigger = !!(buttons & SWITCH_BUTTON_MASK_ZL) * 0xFF;
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_THUMB_L) ? XUSB_GAMEPAD_LEFT_THUMB : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_L) ? XUSB_GAMEPAD_LEFT_SHOULDER : 0;
+            report.bLeftTrigger = !!(buttons & SWITCH_BUTTON_USB_MASK_ZL) * 0xFF;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_THUMB_L) ? XUSB_GAMEPAD_LEFT_THUMB : 0;
 
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_R) ? XUSB_GAMEPAD_RIGHT_SHOULDER : 0;
-            report.bRightTrigger = !!(buttons & SWITCH_BUTTON_MASK_ZR) * 0xFF;
-            report.wButtons |= !!(buttons & SWITCH_BUTTON_MASK_THUMB_R) ? XUSB_GAMEPAD_RIGHT_THUMB : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_R) ? XUSB_GAMEPAD_RIGHT_SHOULDER : 0;
+            report.bRightTrigger = !!(buttons & SWITCH_BUTTON_USB_MASK_ZR) * 0xFF;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_USB_MASK_THUMB_R) ? XUSB_GAMEPAD_RIGHT_THUMB : 0;
 
-            report.sThumbLX = lx;
-            report.sThumbLY = ly;
-            report.sThumbRX = rx;
-            report.sThumbRY = ry;
+            constexpr int_fast64_t SCALE_X_MIN = -100;
+            constexpr int_fast64_t SCALE_X_MAX = 85;
+            constexpr int_fast64_t SCALE_Y_MIN = -100;
+            constexpr int_fast64_t SCALE_Y_MAX = 90;
 
-            ScaleJoystick(report.sThumbLX, report.sThumbLY);
-            ScaleJoystick(report.sThumbRX, report.sThumbRY);
+            report.sThumbLX = ScaleJoystick(SCALE_X_MIN, SCALE_X_MAX, lx);
+            report.sThumbLY = ScaleJoystick(SCALE_Y_MIN, SCALE_Y_MAX, ly);
+            report.sThumbRX = ScaleJoystick(SCALE_X_MIN, SCALE_X_MAX, rx);
+            report.sThumbRY = ScaleJoystick(SCALE_Y_MIN, SCALE_Y_MAX, ry);
 
-            if (report != last_report)
-            {
-                // work around weird xusb driver quirk: https://github.com/nefarius/ViGEm/issues/4
-                for (auto i = 0; i < 3; i++)
-                {
-                    auto ret = vigem_xusb_submit_report(ViGEm_Target, report);
-
-                    if (!VIGEM_SUCCESS(ret))
-                    {
-                        cerr << "error sending report: " << ret << endl;
-
-                        quitting = true;
-                    }
-                }
-
-                last_report = report;
-            }
-
+            HandleController(report);
             break;
         }
         }
     }
+
+    ClearLEDAndVibration();
+}
+
+void ProControllerDevice::BluetoothReadThread()
+{
+    using std::cout;
+    using std::endl;
+    using std::int16_t;
+    using std::int_fast64_t;
+
+    while (!quitting)
+    {
+        const auto data = ReadData();
+
+        if (!data)
+        {
+            continue;
+        }
+
+
+        const auto hid_payload = reinterpret_cast<const ProControllerBluetoothPacket *>(data->data());
+
+        HandleLEDAndVibration();
+
+        if (hid_payload->report_id == 0x3F)
+        {
+
+            const auto& analog = hid_payload->data.controller_data.analog;
+            const auto& hat = hid_payload->data.controller_data.hat;
+            const auto& buttons = hid_payload->data.controller_data.buttons;
+
+            int16_t lx = analog[0] + 32767;
+            int16_t ly = analog[1] + 32767;
+            int16_t rx = analog[2] + 32767;
+            int16_t ry = analog[3] + 32767;
+
+#ifdef PRO_CONTROLLER_DEBUG_OUTPUT
+            cout << "A: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_A) << ", ";
+            cout << "B: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_B) << ", ";
+            cout << "X: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_X) << ", ";
+            cout << "Y: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_Y) << ", ";
+
+            cout << "P: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_PLUS) << ", ";
+            cout << "M: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_MINUS) << ", ";
+            cout << "H: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_HOME) << ", ";
+            cout << "S: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_SHARE) << ", ";
+
+            cout << "L: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_L) << ", ";
+            cout << "ZL: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_ZL) << ", ";
+            cout << "TL: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_THUMB_L) << ", ";
+
+            cout << "R: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_R) << ", ";
+            cout << "ZR: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_ZR) << ", ";
+            cout << "TR: " << !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_THUMB_R) << ", ";
+
+            cout << "DPAD: " << +hat << ", ";
+
+            cout << "LX: " << +lx << ", ";
+            cout << "LY: " << +ly << ", ";
+
+            cout << "RX: " << +rx << ", ";
+            cout << "RY: " << +ry;
+
+            cout << endl;
+#endif
+
+            XUSB_REPORT report = { 0 };
+
+            // assign a/b/x/y so they match the positions on the xbox layout
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_A) ? XUSB_GAMEPAD_B : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_B) ? XUSB_GAMEPAD_A : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_X) ? XUSB_GAMEPAD_Y : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_Y) ? XUSB_GAMEPAD_X : 0;
+
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_PLUS) ? XUSB_GAMEPAD_START : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_MINUS) ? XUSB_GAMEPAD_BACK : 0;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_HOME) ? XUSB_GAMEPAD_GUIDE : 0;
+
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_L) ? XUSB_GAMEPAD_LEFT_SHOULDER : 0;
+            report.bLeftTrigger = !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_ZL) * 0xFF;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_THUMB_L) ? XUSB_GAMEPAD_LEFT_THUMB : 0;
+
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_R) ? XUSB_GAMEPAD_RIGHT_SHOULDER : 0;
+            report.bRightTrigger = !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_ZR) * 0xFF;
+            report.wButtons |= !!(buttons & SWITCH_BUTTON_BLUETOOTH_MASK_THUMB_R) ? XUSB_GAMEPAD_RIGHT_THUMB : 0;
+
+            switch (hat)
+            {
+            case 0x00:
+            {
+                report.wButtons |= XUSB_GAMEPAD_DPAD_UP;
+                break;
+            }
+            case 0x01:
+            {
+                report.wButtons |= XUSB_GAMEPAD_DPAD_UP | XUSB_GAMEPAD_DPAD_RIGHT;
+                break;
+            }
+            case 0x02:
+            {
+                report.wButtons |= XUSB_GAMEPAD_DPAD_RIGHT;
+                break;
+            }
+            case 0x03:
+            {
+                report.wButtons |= XUSB_GAMEPAD_DPAD_RIGHT | XUSB_GAMEPAD_DPAD_DOWN;
+                break;
+            }
+            case 0x04:
+            {
+                report.wButtons |= XUSB_GAMEPAD_DPAD_DOWN;
+                break;
+            }
+            case 0x05:
+            {
+                report.wButtons |= XUSB_GAMEPAD_DPAD_DOWN | XUSB_GAMEPAD_DPAD_LEFT;
+                break;
+            }
+            case 0x06:
+            {
+                report.wButtons |= XUSB_GAMEPAD_DPAD_LEFT;
+                break;
+            }
+            case 0x07:
+            {
+                report.wButtons |= XUSB_GAMEPAD_DPAD_LEFT | XUSB_GAMEPAD_DPAD_UP;
+                break;
+            }
+            }
+
+            constexpr int_fast64_t SCALE_X_MIN = -25000;
+            constexpr int_fast64_t SCALE_X_MAX = 22000;
+            constexpr int_fast64_t SCALE_Y_MIN = -25000;
+            constexpr int_fast64_t SCALE_Y_MAX = 23000;
+
+            report.sThumbLX = ScaleJoystick(SCALE_X_MIN, SCALE_X_MAX, lx);
+            report.sThumbLY = ScaleJoystick(SCALE_Y_MIN, SCALE_Y_MAX, -ly);
+            report.sThumbRX = ScaleJoystick(SCALE_X_MIN, SCALE_X_MAX, rx);
+            report.sThumbRY = ScaleJoystick(SCALE_Y_MIN, SCALE_Y_MAX, -ry);
+
+            HandleController(report);
+        }
+    }
+
+    ClearLEDAndVibration();
+}
+
+void ProControllerDevice::HandleLEDAndVibration()
+{
+    using std::chrono::steady_clock;
+    using std::chrono::milliseconds;
+    using std::uint8_t;
+    using std::lock_guard;
+
+    const auto now = steady_clock::now();
+
+    if (now > last_rumble + milliseconds(100))
+    {
+        if (led_number != last_led)
+        {
+            bytes buf = { 0x01, static_cast<uint8_t>(counter++ & 0x0F), 0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40, 0x30, static_cast<uint8_t>(1 << led_number) };
+            WriteData(buf);
+
+            last_led = led_number;
+        }
+        else
+        {
+            bytes buf = { 0x10, static_cast<uint8_t>(counter++ & 0x0F), 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00 };
+
+            {
+                lock_guard<spinlock> lk(rumble_lock);
+
+                // discovered through trial and error, seem to be good enough
+                // NOTE: xinput left/right motors are actually functionally different, not for directional rumble
+                if (large_motor != 0)
+                {
+                    buf[2] = buf[6] = 0x80;
+                    buf[3] = buf[7] = 0x20;
+                    buf[4] = buf[8] = 0x62;
+                    buf[5] = buf[9] = large_motor >> 2;
+                }
+                else if (small_motor != 0)
+                {
+                    buf[2] = buf[6] = 0x98;
+                    buf[3] = buf[7] = 0x20;
+                    buf[4] = buf[8] = 0x62;
+                    buf[5] = buf[9] = small_motor >> 2;
+                }
+
+                if (motor_large_will_empty)
+                {
+                    large_motor = 0;
+                    motor_large_will_empty = false;
+                }
+
+                if (motor_small_will_empty)
+                {
+                    small_motor = 0;
+                    motor_small_will_empty = false;
+                }
+
+                motor_large_waiting = false;
+                motor_small_waiting = false;
+            }
+
+            WriteData(buf);
+        }
+
+        last_rumble = now;
+    }
+}
+
+void ProControllerDevice::ClearLEDAndVibration()
+{
+    using std::this_thread::sleep_for;
+    using std::chrono::milliseconds;
 
     sleep_for(milliseconds(100));
 
@@ -430,32 +628,48 @@ void ProControllerDevice::ReadThread()
     }
 }
 
-void ProControllerDevice::ScaleJoystick(std::int16_t& x, std::int16_t& y)
+void ProControllerDevice::HandleController(const XUSB_REPORT& report)
+{
+    using std::cerr;
+    using std::endl;
+
+    if (report != last_report)
+    {
+        // work around weird xusb driver quirk: https://github.com/nefarius/ViGEm/issues/4
+        for (auto i = 0; i < 3; i++)
+        {
+            auto ret = vigem_xusb_submit_report(ViGEm_Target, report);
+
+            if (!VIGEM_SUCCESS(ret))
+            {
+                cerr << "error sending report: " << ret << endl;
+
+                quitting = true;
+            }
+        }
+
+        last_report = report;
+    }
+}
+
+std::int16_t ProControllerDevice::ScaleJoystick(std::int_fast64_t src_min, std::int_fast64_t src_max, std::int16_t val)
 {
     using std::int16_t;
-    using std::int_fast32_t;
+    using std::int_fast64_t;
     using std::clamp;
     using std::numeric_limits;
 
     typedef numeric_limits<int16_t> int16_limts;
 
-    constexpr int_fast32_t DST_MIN = int16_limts::min();
-    constexpr int_fast32_t DST_MAX = int16_limts::max();
-    constexpr int_fast32_t DST_RNG = DST_MAX - DST_MIN;
+    constexpr int_fast64_t DST_MIN = int16_limts::min();
+    constexpr int_fast64_t DST_MAX = int16_limts::max();
+    constexpr int_fast64_t DST_RNG = DST_MAX - DST_MIN;
 
-    constexpr int_fast32_t SRC_X_MIN = -100;
-    constexpr int_fast32_t SRC_X_MAX = 85;
-    constexpr int_fast32_t SRC_X_RNG = SRC_X_MAX - SRC_X_MIN;
+    const int_fast64_t src_rng = src_max - src_min;
 
-    constexpr int_fast32_t SRC_Y_MIN = -100;
-    constexpr int_fast32_t SRC_Y_MAX = 90;
-    constexpr int_fast32_t SRC_Y_RNG = SRC_Y_MAX - SRC_Y_MIN;
+    auto new_val = (((val - src_min) * DST_RNG) / src_rng) + DST_MIN;
 
-    auto new_x = (((x - SRC_X_MIN) * DST_RNG) / SRC_X_RNG) + DST_MIN;
-    auto new_y = (((y - SRC_Y_MIN) * DST_RNG) / SRC_Y_RNG) + DST_MIN;
-
-    x = static_cast<int16_t>(clamp(new_x, DST_MIN, DST_MAX));
-    y = static_cast<int16_t>(clamp(new_y, DST_MIN, DST_MAX));
+    return static_cast<int16_t>(clamp(new_val, DST_MIN, DST_MAX));
 }
 
 bool ProControllerDevice::Valid() {
@@ -600,7 +814,6 @@ void ProControllerDevice::HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_mo
     using std::cout;
     using std::endl;
     using std::lock_guard;
-    using std::mutex;
 
 #ifdef PRO_CONTROLLER_DEBUG_OUTPUT
     cout << "XUSB CALLBACK (";

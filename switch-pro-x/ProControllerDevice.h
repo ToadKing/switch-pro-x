@@ -31,11 +31,15 @@ public:
 private:
     typedef std::vector<std::uint8_t> bytes;
 
-    void ReadThread();
+    void USBReadThread();
+    void BluetoothReadThread();
+    void HandleLEDAndVibration();
+    void ClearLEDAndVibration();
+    void HandleController(const XUSB_REPORT& report);
     std::optional<bytes> ReadData();
     void WriteData(const bytes& data);
     bool CheckIOError(DWORD err);
-    void ScaleJoystick(std::int16_t& x, std::int16_t& y);
+    std::int16_t ScaleJoystick(std::int_fast64_t src_min, std::int_fast64_t src_max, std::int16_t val);
 
     std::uint8_t counter;
     HANDLE handle;
@@ -55,4 +59,8 @@ private:
     bool connected;
     std::atomic<bool> quitting;
     std::thread read_thread;
+
+    bool is_bluetooth;
+    UCHAR last_led = 0xFF;
+    XUSB_REPORT last_report;
 };
