@@ -29,7 +29,7 @@ public:
     const tstring Path;
 
 private:
-    typedef std::vector<std::uint8_t> bytes;
+    using bytes = std::vector<std::uint8_t>;
 
     void USBReadThread();
     void BluetoothReadThread();

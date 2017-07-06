@@ -130,7 +130,7 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
     using std::thread;
 
     handle = CreateFile(
-        path.c_str(),
+        Path.c_str(),
         GENERIC_WRITE | GENERIC_READ,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
         nullptr,
@@ -145,7 +145,7 @@ ProControllerDevice::ProControllerDevice(const tstring& path)
         if (err != ERROR_ACCESS_DENIED)
         {
             cerr << "error opening ";
-            *tcerr << path;
+            tcerr << Path;
             cerr << " (" << GetLastError() << ")" << endl;
         }
 
@@ -816,7 +816,7 @@ void ProControllerDevice::HandleXUSBCallback(UCHAR _large_motor, UCHAR _small_mo
 
 #ifdef PRO_CONTROLLER_DEBUG_OUTPUT
     cout << "XUSB CALLBACK (";
-    *tcout << Path;
+    tcout << Path;
     cout << ") LARGE MOTOR: " << +_large_motor << ", SMALL MOTOR: " << +_small_motor << ", LED: " << +_led_number << endl;
 #endif
 

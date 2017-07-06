@@ -5,45 +5,51 @@
 #include <iostream>
 #include <algorithm>
 
+#ifdef UNICODE
+#include <cwctype>
+#else
 #include <cctype>
+#endif
+
+#include <cstdint>
 
 #include <ViGEmUM.h>
 
 namespace
 {
 #ifdef UNICODE
-    typedef std::wstring tstring;
-    const auto tcout = &std::wcout;
-    const auto tcerr = &std::wcerr;
+    using tstring = std::wstring;
+    constexpr auto& ttolower = std::towlower;
+    auto& tcout = std::wcout;
+    auto& tcerr = std::wcerr;
 #else
-    typedef std::string tstring;
-    const auto tcout = &std::cout;
-    const auto tcerr = &std::cerr;
+    using tstring = std::string;
+    constexpr auto& ttolower = std::tolower;
+    auto& tcout = std::cout;
+    auto& tcerr = std::cerr;
 #endif
 
     constexpr LPCTSTR WND_MODULE_NAME = TEXT("switch-pro-x.exe");
-    constexpr uint16_t PRO_CONTROLLER_VID = 0x057E;
-    constexpr uint16_t PRO_CONTROLLER_PID = 0x2009;
+    constexpr std::uint16_t PRO_CONTROLLER_VID = 0x057E;
+    constexpr std::uint16_t PRO_CONTROLLER_PID = 0x2009;
 
     inline bool tstring_icompare(const tstring& lhs, const tstring& rhs)
     {
         using std::equal;
-        using std::tolower;
 
         if (lhs.size() != rhs.size())
         {
             return false;
         }
 
-        return equal(lhs.begin(), lhs.end(), rhs.begin(), [](const auto& lhs, const auto& rhs) { return tolower(lhs) == tolower(rhs); });
+        return equal(lhs.begin(), lhs.end(), rhs.begin(), [](const auto& lhs, const auto& rhs) { return ttolower(lhs) == ttolower(rhs); });
     }
 
     inline tstring::size_type tstring_ifind(const tstring& lhs, const tstring& rhs)
     {
         using std::search;
-        using std::tolower;
 
-        auto it = search(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), [](const auto& lhs, const auto& rhs) { return tolower(lhs) == tolower(rhs); });
+        auto it = search(lhs.begin(), lhs.end(), rhs.begin(), rhs.end(), [](const auto& lhs, const auto& rhs) { return ttolower(lhs) == ttolower(rhs); });
 
         if (it == lhs.end())
         {

@@ -43,7 +43,7 @@ void AddController(const tstring &path)
     if (device->Valid())
     {
         cout << "FOUND PRO CONTROLLER: ";
-        *tcout << device->Path;
+        tcout << device->Path;
         cout << endl;
         proControllers.insert(move(device));
     }
@@ -64,7 +64,7 @@ void RemoveController(const tstring &path)
     if (it != proControllers.end())
     {
         cout << "REMOVED PRO CONTROLLER: ";
-        *tcout << (*it)->Path;
+        tcout << (*it)->Path;
         cout << endl;
         proControllers.erase(it);
     }
