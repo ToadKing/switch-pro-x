@@ -569,17 +569,18 @@ void ProControllerDevice::HandleLEDAndVibration()
                 // NOTE: xinput left/right motors are actually functionally different, not for directional rumble
                 if (large_motor != 0)
                 {
-                    buf[2] = buf[6] = 0x80;
-                    buf[3] = buf[7] = 0x20;
-                    buf[4] = buf[8] = 0x62;
-                    buf[5] = buf[9] = large_motor >> 2;
+                    buf[2] = 0x80;
+                    buf[3] = 0x20;
+                    buf[4] = 0x62;
+                    buf[5] = large_motor >> 2;
                 }
-                else if (small_motor != 0)
+
+                if (small_motor != 0)
                 {
-                    buf[2] = buf[6] = 0x98;
-                    buf[3] = buf[7] = 0x20;
-                    buf[4] = buf[8] = 0x62;
-                    buf[5] = buf[9] = small_motor >> 2;
+                    buf[6] = 0x98;
+                    buf[7] = 0x20;
+                    buf[8] = 0x62;
+                    buf[9] = small_motor >> 2;
                 }
 
                 if (motor_large_will_empty)
