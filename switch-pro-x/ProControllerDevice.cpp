@@ -246,7 +246,7 @@ ProControllerDevice::~ProControllerDevice()
 
     if (connected)
     {
-        //vigem_unregister_xusb_notification(XUSBCallback);
+        vigem_unregister_xusb_notification(XUSBCallback, ViGEm_Target);
         vigem_target_unplug(&ViGEm_Target);
     }
 }
