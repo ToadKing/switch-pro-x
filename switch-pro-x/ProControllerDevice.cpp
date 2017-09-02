@@ -635,19 +635,15 @@ void ProControllerDevice::HandleController(const XUSB_REPORT& report)
 
     if (report != last_report)
     {
-        // work around weird xusb driver quirk: https://github.com/nefarius/ViGEm/issues/4
-        for (auto i = 0; i < 3; i++)
+        auto ret = vigem_xusb_submit_report(ViGEm_Target, report);
+
+        if (!VIGEM_SUCCESS(ret))
         {
-            auto ret = vigem_xusb_submit_report(ViGEm_Target, report);
+            cerr << "error sending report: " << ret << endl;
 
-            if (!VIGEM_SUCCESS(ret))
-            {
-                cerr << "error sending report: " << ret << endl;
-
-                quitting = true;
-            }
+            quitting = true;
         }
-
+      
         last_report = report;
     }
 }
